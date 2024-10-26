@@ -26,7 +26,7 @@ bool systemActive = false;
 const char* ssid = "H"; //TODO: replace with wifi ssid
 const char* password = "88888889"; //TODO: replace with wifi password
 
-//const char* openai_api_key = "";
+const char* openai_api_key = "";
 const char* openai_url = "https://api.openai.com/v1/chat/completions";
 WiFiClientSecure client;
 
