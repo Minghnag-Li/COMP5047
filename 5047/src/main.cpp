@@ -1,9 +1,15 @@
+
+
+#include <Arduino.h>
+#include <ESPAsyncWebServer.h>
+#include <HTTPClient.h>
 #include <TinyGPS++.h>
 #include <HardwareSerial.h>
 #include <driver/i2s.h>
-#include <esp_sleep.h>  // Include ESP sleep library
-
-// Create a TinyGPS++ object
+#include <esp_sleep.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 TinyGPSPlus gps;
 
 // Define hardware serial port for GPS
@@ -14,11 +20,16 @@ HardwareSerial SerialGPS(2);
 #define I2S_LRCLK 12  // Left-Right Clock pin
 #define I2S_DIN 22    // Data Input pin
 
-// Define pin for start/stop switch
 #define SWITCH_PIN 34
 
-// Variable to track system state
 bool systemActive = false;
+const char* ssid = "H"; //TODO: replace with wifi ssid
+const char* password = "88888889"; //TODO: replace with wifi password
+
+const char* openai_api_key = "";
+const char* openai_url = "https://api.openai.com/v1/chat/completions";
+WiFiClientSecure client;
+
 
 // Function to configure I2S for audio
 void setupI2S() {
@@ -59,6 +70,147 @@ void generateTone() {
     }
 }
 
+/**
+ * String callOpenAI(const String& prompt) {
+    String response = "";
+    if (WiFi.status() == WL_CONNECTED) {
+        // Disable SSL certificate verification
+        client.setInsecure();
+        
+        HTTPClient https;
+        
+        // Initialize HTTPS client with WiFiClientSecure
+        if (https.begin(client, openai_url)) {
+            // Add headers
+            https.addHeader("Content-Type", "application/json");
+            https.addHeader("Authorization", String("Bearer ") + openai_api_key);
+            
+            // Create JSON document for the request
+            JsonDocument requestDoc;
+            requestDoc["model"] = "gpt-3.5-turbo";
+            requestDoc["messages"] = prompt;
+            requestDoc["max_tokens"] = 100;
+            requestDoc["temperature"] = 0.7;
+            
+            // Serialize JSON to string
+            String requestBody;
+            serializeJson(requestDoc, requestBody);
+            
+            // Make POST request
+            int httpResponseCode = https.POST(requestBody);
+            
+            if (httpResponseCode > 0) {
+                response = https.getString();
+                
+                // Parse the response
+                JsonDocument responseDoc;
+                DeserializationError error = deserializeJson(responseDoc, response);
+                Serial.println(response);
+                if (!error) {
+                    // Extract the generated text from the response
+                    if (responseDoc["choices"][0]["text"]) {
+                        response = responseDoc["choices"][0]["text"].as<String>();
+                    } else {
+                        response = "Error: Unable to parse response choices";
+                    }
+                } else {
+                    response = "Error: JSON parsing failed";
+                }
+            } else {
+                response = "Error: HTTP request failed with code " + String(httpResponseCode);
+            }
+            
+            https.end();
+        } else {
+            response = "Error: Unable to connect to OpenAI API";
+        }
+    } else {
+        response = "Error: WiFi not connected";
+    }
+    
+    return response;
+}
+
+            requestDoc["model"] = "gpt-3.5-turbo";
+            
+            // Create an array for messages
+            JsonArray messages = requestDoc.createNestedArray("messages");
+            
+            // Add user message to the messages array
+            JsonObject userMessage = messages.createNestedObject();
+            userMessage["role"] = "user";
+            userMessage["content"] = prompt;
+            
+            requestDoc["max_tokens"] = 100;
+            requestDoc["temperature"] = 0.7;
+ */
+
+String callOpenAI(const String& prompt) {
+    String response = "";
+    if (WiFi.status() == WL_CONNECTED) {
+        // Disable SSL certificate verification
+        client.setInsecure();
+        
+        HTTPClient https;
+        
+        // Initialize HTTPS client with WiFiClientSecure
+        if (https.begin(client, openai_url)) {
+            // Add headers
+            https.addHeader("Content-Type", "application/json");
+            https.addHeader("Authorization", String("Bearer ") + openai_api_key);
+            
+            // Create JSON document for the request
+            JsonDocument requestDoc;
+            requestDoc["model"] = "gpt-3.5-turbo";
+            
+            JsonArray messages = requestDoc.createNestedArray("messages");
+            
+            JsonObject userMessage = messages.createNestedObject();
+            userMessage["role"] = "user";
+            userMessage["content"] = prompt;
+            
+            requestDoc["max_tokens"] = 100;
+            requestDoc["temperature"] = 0.7;
+            
+            // Serialize JSON to string
+            String requestBody;
+            serializeJson(requestDoc, requestBody);
+            
+            // Make POST request
+            int httpResponseCode = https.POST(requestBody);
+            
+            if (httpResponseCode > 0) {
+                response = https.getString();
+                
+                // Parse the response
+                JsonDocument responseDoc;
+                DeserializationError error = deserializeJson(responseDoc, response);
+                Serial.println(response);
+                if (!error) {
+                    // Extract the generated text from the response
+                    if (responseDoc["choices"][0]["text"]) {
+                        response = responseDoc["choices"][0]["text"].as<String>();
+                    } else {
+                        response = "Error: Unable to parse response choices";
+                    }
+                } else {
+                    response = "Error: JSON parsing failed";
+                }
+            } else {
+                response = "Error: HTTP request failed with code " + String(httpResponseCode);
+            }
+            
+            https.end();
+        } else {
+            response = "Error: Unable to connect to OpenAI API";
+        }
+    } else {
+        response = "Error: WiFi not connected";
+    }
+    
+    return response;
+}
+
 void setup() {
     // Start the serial communication for debugging
     Serial.begin(115200);
@@ -70,15 +222,22 @@ void setup() {
 
     // Initialize I2S
     setupI2S();
-
     // Configure switch pin
     pinMode(SWITCH_PIN, INPUT);
-
+    WiFi.begin(ssid, password); // Begin the connection to the specified Wi-Fi network.
+    while (WiFi.status() != WL_CONNECTED) { // Check the connection status.
+        delay(1000); // Wait 1 second before trying again.
+        Serial.println("Connecting to Wi-Fi..."); // Print a message to the serial monitor.
+    }
+    Serial.println("Connected to Wi-Fi"); // Print a message when successfully connected.
+    String response = callOpenAI("Please generate a 500 words long story for kids with the theme of futuristic");
+    Serial.println(response);
     // Configure wakeup source
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(SWITCH_PIN), 1);  // Wake up when switch is turned ON
 }
 
 void loop() {
+
     // Check the state of the switch
     bool currentSwitchState = digitalRead(SWITCH_PIN);
     if (currentSwitchState == LOW) {
