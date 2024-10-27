@@ -24,7 +24,13 @@ The backend uses the Django framework to process HTTP requests.
 
    to run the backend.
 
-4. GET http://localhost:8000/tts to generate a TTS wav file on the server.
+4. GET http://192.168.137.1:8000/tts to generate a TTS WAV file on the server.
 
 5. GET http://192.168.137.1:8000/tts/result to get the result of TTS.
+
+
+
+> [!note]
+>
+> 192.168.137.1 is the default host IP of a Windows hotspot. If you change the host, you need to modify the code in google_tts.cpp in PlatformIO project.
 
