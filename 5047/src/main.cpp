@@ -23,7 +23,7 @@ HardwareSerial SerialGPS(2);
 #define I2S_LRCLK 12 // Left-Right Clock pin
 #define I2S_DIN 22   // Data Input pin
 
-#define SWITCH_PIN 34
+#define SWITCH_PIN 35
 
 #define S0 13
 #define S1 14
@@ -299,7 +299,10 @@ The end.)";
 
     // String text = "We are going to pass pervasive computing.";
 
-    RequestBackendTTS(text);
+    bool result = RequestBackendTTS(text);
+    
+    Serial.println("RequestBackendTTS result: ");
+    Serial.println(result);
 
     // Configure wakeup source
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(SWITCH_PIN), 1); // Wake up when switch is turned ON
