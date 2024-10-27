@@ -83,87 +83,155 @@ WiFiClientSecure client;
             requestDoc["temperature"] = 0.7;
  */
 
-String callOpenAI(const String &prompt)
-{
+
+String callOpenAI(const String& prompt) {
     String response = "";
-    if (WiFi.status() == WL_CONNECTED)
-    {
+    if (WiFi.status() == WL_CONNECTED) {
         // Disable SSL certificate verification
         client.setInsecure();
-
+        
         HTTPClient https;
-
+        
         // Initialize HTTPS client with WiFiClientSecure
-        if (https.begin(client, openai_url))
-        {
+        if (https.begin(client, openai_url)) {
             // Add headers
             https.addHeader("Content-Type", "application/json");
             https.addHeader("Authorization", String("Bearer ") + openai_api_key);
-
+            
             // Create JSON document for the request
             JsonDocument requestDoc;
             requestDoc["model"] = "gpt-3.5-turbo";
-
+            
             JsonArray messages = requestDoc.createNestedArray("messages");
-
+            
             JsonObject userMessage = messages.createNestedObject();
             userMessage["role"] = "user";
             userMessage["content"] = prompt;
-
-            requestDoc["max_tokens"] = 100;
+            
+            requestDoc["max_tokens"] = 400;
             requestDoc["temperature"] = 0.7;
-
+            
             // Serialize JSON to string
             String requestBody;
             serializeJson(requestDoc, requestBody);
-
+            
             // Make POST request
             int httpResponseCode = https.POST(requestBody);
-
-            if (httpResponseCode > 0)
-            {
+            
+            if (httpResponseCode > 0) {
                 response = https.getString();
-
+                
                 // Parse the response
                 JsonDocument responseDoc;
                 DeserializationError error = deserializeJson(responseDoc, response);
                 Serial.println(response);
-                if (!error)
-                {
+                if (!error) {
                     // Extract the generated text from the response
-                    if (responseDoc["choices"][0]["text"])
-                    {
+                    if (responseDoc["choices"][0]["text"]) {
                         response = responseDoc["choices"][0]["text"].as<String>();
-                    }
-                    else
-                    {
+                    } else {
                         response = "Error: Unable to parse response choices";
                     }
-                }
-                else
-                {
+                } else {
                     response = "Error: JSON parsing failed";
                 }
-            }
-            else
-            {
+            } else {
                 response = "Error: HTTP request failed with code " + String(httpResponseCode);
             }
-
+            
             https.end();
-        }
-        else
-        {
+        } else {
             response = "Error: Unable to connect to OpenAI API";
         }
-    }
-    else
-    {
+    } else {
         response = "Error: WiFi not connected";
     }
-
+    
     return response;
 }
+
+
+// String callOpenAI(const String &prompt)
+// {
+//     String response = "";
+//     if (WiFi.status() == WL_CONNECTED)
+//     {
+//         // Disable SSL certificate verification
+//         client.setInsecure();
+
+//         HTTPClient https;
+
+//         // Initialize HTTPS client with WiFiClientSecure
+//         if (https.begin(client, openai_url))
+//         {
+//             // Add headers
+//             https.addHeader("Content-Type", "application/json");
+//             https.addHeader("Authorization", String("Bearer ") + openai_api_key);
+
+//             // Create JSON document for the request
+//             JsonDocument requestDoc;
+//             requestDoc["model"] = "gpt-3.5-turbo";
+
+//             JsonArray messages = requestDoc.createNestedArray("messages");
+
+//             JsonObject userMessage = messages.createNestedObject();
+//             userMessage["role"] = "user";
+//             userMessage["content"] = prompt;
+
+//             requestDoc["max_tokens"] = 100;
+//             requestDoc["temperature"] = 0.7;
+
+//             // Serialize JSON to string
+//             String requestBody;
+//             serializeJson(requestDoc, requestBody);
+
+//             // Make POST request
+//             int httpResponseCode = https.POST(requestBody);
+
+//             if (httpResponseCode > 0)
+//             {
+//                 response = https.getString();
+
+//                 // Parse the response
+//                 JsonDocument responseDoc;
+//                 DeserializationError error = deserializeJson(responseDoc, response);
+//                 Serial.println(response);
+//                 if (!error)
+//                 {
+//                     // Extract the generated text from the response
+//                     if (responseDoc["choices"][0]["text"])
+//                     {
+//                         response = responseDoc["choices"][0]["text"].as<String>();
+//                     }
+//                     else
+//                     {
+//                         response = "Error: Unable to parse response choices";
+//                     }
+//                 }
+//                 else
+//                 {
+//                     response = "Error: JSON parsing failed";
+//                 }
+//             }
+//             else
+//             {
+//                 response = "Error: HTTP request failed with code " + String(httpResponseCode);
+//             }
+
+//             https.end();
+//         }
+//         else
+//         {
+//             response = "Error: Unable to connect to OpenAI API";
+//         }
+//     }
+//     else
+//     {
+//         response = "Error: WiFi not connected";
+//     }
+
+//     return response;
+// }
 
 /**
  * String callOpenAI(const String& prompt) {

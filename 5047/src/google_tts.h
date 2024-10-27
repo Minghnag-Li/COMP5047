@@ -3,6 +3,13 @@
 
 #include <Arduino.h>
 
+extern bool bool_pause;
+extern bool requesting;
+
+extern WiFiClient *stream;
+extern size_t bytesRead;
+extern uint8_t buffer[512];
+
 // void base64UrlEncode(const unsigned char *input, size_t length, String &output);
 // void signJWT(const String &message, const char *private_key, String &signature);
 // bool SetupNTPTime();

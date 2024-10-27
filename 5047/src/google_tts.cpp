@@ -11,6 +11,17 @@
 
 #include <driver/i2s.h>
 
+#define I2S_BCLK 4   // Bit Clock pin
+#define I2S_LRCLK 12 // Left-Right Clock pin
+#define I2S_DIN 22   // Data Input pin
+
+bool bool_pause = false;
+bool requesting = false;
+
+WiFiClient *stream = nullptr;
+size_t bytesRead;
+uint8_t buffer[512];
+
 // The private key of Google service account
 const char *private_key = "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDkgs6YdHoBR+Sy\nT/vNM4hEIr7rTtfwArBDc/O/hnHDPVFCf3YhkkDLKkhnqc4Ihpqpvfimk1NzDlrX\nVa5OeSNtRbNTfOOmxZUSE+VdT5C0aHdwU1B/jVB/QNM2GGCcRbEHWYW9CC1tWY/1\nglHR7eeczOj5F/1e4aqB9YOTr2f++326HdMW71Z0g2KQNS3MoBxYFFbeVpeLmxVZ\nVdG24HP+k0uGS3h0/95kwvvoCzk1dLbb+jMwIeIQxImfhcHup68QGS8aZjB9cJZK\ntKLBlkrW4VQ3eAKMbPNcys3YpYI4rpqleN0CRcqQ5NL1thKCK4oxK6qapDOvFRRv\nIcCygpUZAgMBAAECggEAAvuLvr8jvVHKUbDcGxyCkDD3RF+cBkGMJ/apt3gzgGUm\nJ5KZJ5PFrGkxP/60/QKtwyfQmxeRp4FRQ7AWMx4M1rzOgJlFhA6MDAv7080E+RfZ\n560DknwQldKf8o4vFDTPl8ZgYKDjUjCw2Hc+C0MezyPdDmO0wMszAfQ1Qe50+6Ep\n3ExgvzJCUKRq5uMNCMvDS3Bt/Xy51YhAIqsNIPml5BE0TtwGex4y0+uWWzFrXyN/\n/E1QIev+XUr/8UKBAq1T8m3ZAM7nYWIJg8rTp4Yn3CS858mYoZniAGqNQRCNsfoG\n7yV/jnhA98wMAYNhecYzBhv6MRS5+9/FYynZ8EXBYQKBgQD7gRfyHoTrYf48VSaV\nJnFfEer+8R/q7rG7izgkSLIp0TENISLwykMtPMJW0U28ZTR577r2fkuTsR2aPq9b\nOA0ykW9biGer7QOzZnjtYTUFTvZ94qS59f6oqRgkhKINDTvkOShPRvYyLI55R9hL\nISvTisQLljOV3Zu5D2HDWmvCeQKBgQDomH53X/N/SWNgkoMH9bdCmmijnnu3FGRG\nQ7zkT+M5MCD95irezulHP4KRoIlMfDGvprMxOw7fpfZ1y+AKlGgYxWrCXRaiBUyq\nQIPZT/SbTjmQI6XrjoMPeAv238Wk/Z1KDQnOWLLvRFklPZaDRmWYfdeqwcp9oI1o\n97wyYo2/oQKBgQD2BTXTVh9X0afMhM8VH2HPScvCT0SVn6CkgG8Orz34wfVljoCL\nYo+L9N915ZBRNf67ONJ+xNRRSPRYKfGHHbFrQfDYbPpcp6DzIM4yBuDCrJdaVRYm\nAoh1m9NOBaAvfD6V5YOU6Slzszo7URg3hd9FM3zKiMc1Vm45/N35Jr46oQKBgQCS\nkO04KeVVMxiFFS2uSV62gHgpikdpAVeCk1KnB9QmCDbx5yTii72h4NpVC7UY1jW0\n+rV180IXGgxpBBRkdkn2Oghg+6m0ZOR/b/HlcSWw66UIN/5opb/ecoYPhciUhB+m\nNvsT5P60GPyXo+yBQk3ovnu1JTKE4TPajikwErxBoQKBgQD13ufd3lUZSQBkUe1N\nghxdOjcnHHx2odouxU2Hnr3Rij8JitjK7D6U+9hKHnYXVqoXStSo+5A0LWS1MLM6\n8ZupFxnhRKP//Ar1RlL+gLLvaU32ar2nFk9N/NogMi4SLT2y+aQDYAQ+NN6xj9dc\ntaXrQrY0F/SIR0MvEmyZGdfXBQ==\n-----END PRIVATE KEY-----\n";
 
@@ -339,25 +350,14 @@ String urlEncode(String str)
     return encodedString;
 }
 
-#define I2S_BCLK 4   // Bit Clock pin
-#define I2S_LRCLK 12 // Left-Right Clock pin
-#define I2S_DIN 22   // Data Input pin
-
-bool pause;
-bool requesting = false;
-
-WiFiClient *stream = nullptr;
-size_t bytesRead;
-uint8_t buffer[512];
-
 void Pause()
 {
-    pause = !pause;
+    bool_pause = !bool_pause;
 }
 
 void Loop()
 {
-    if (stream != nullptr and !pause and !requesting)
+    if (stream != nullptr and !bool_pause and !requesting)
     {
         if (stream->connected() && (bytesRead = stream->readBytes(buffer, sizeof(buffer))) > 0)
         {
