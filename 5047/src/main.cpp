@@ -10,6 +10,8 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <iostream>
+#include <string>
 TinyGPSPlus gps;
 
 // Define hardware serial port for GPS
@@ -22,13 +24,49 @@ HardwareSerial SerialGPS(2);
 
 #define SWITCH_PIN 34
 
+#define S0 13
+#define S1 14
+#define S2 0
+#define S3 26
+#define OUT_PIN 25
+
 bool systemActive = false;
+bool onQuest = false;
 const char* ssid = "H"; //TODO: replace with wifi ssid
 const char* password = "88888889"; //TODO: replace with wifi password
 
 const char* openai_api_key = "";
 const char* openai_url = "https://api.openai.com/v1/chat/completions";
 WiFiClientSecure client;
+int player_num = 0;
+std::stringstream prompt;
+
+
+
+volatile unsigned long redPulseCount = 0;
+volatile unsigned long greenPulseCount = 0;
+volatile unsigned long bluePulseCount = 0;
+hw_timer_t *timer = NULL;
+
+
+void IRAM_ATTR onTimer() {
+  static int currentColor = 0; // 0: Red, 1: Green, 2: Blue
+  if (currentColor == 0) {
+    digitalWrite(S2, LOW);
+    digitalWrite(S3, LOW);
+    redPulseCount = pulseIn(OUT_PIN, LOW, 1000000);  // 读取脉冲
+    currentColor = 1;  // 切换到绿色
+  } else if (currentColor == 1) {
+    digitalWrite(S2, HIGH);
+    digitalWrite(S3, HIGH);
+    greenPulseCount = pulseIn(OUT_PIN, LOW, 1000000);  // 读取脉冲
+    currentColor = 2;  // 切换到蓝色
+  } else if (currentColor == 2) {
+    digitalWrite(S2, LOW);
+    digitalWrite(S3, HIGH);
+    bluePulseCount = pulseIn(OUT_PIN, LOW, 1000000);  // 读取脉冲
+    currentColor = 0;  // 切换回红色
+  }
 
 
 // Function to configure I2S for audio
@@ -70,80 +108,12 @@ void generateTone() {
     }
 }
 
-/**
- * String callOpenAI(const String& prompt) {
-    String response = "";
-    if (WiFi.status() == WL_CONNECTED) {
-        // Disable SSL certificate verification
-        client.setInsecure();
-        
-        HTTPClient https;
-        
-        // Initialize HTTPS client with WiFiClientSecure
-        if (https.begin(client, openai_url)) {
-            // Add headers
-            https.addHeader("Content-Type", "application/json");
-            https.addHeader("Authorization", String("Bearer ") + openai_api_key);
-            
-            // Create JSON document for the request
-            JsonDocument requestDoc;
-            requestDoc["model"] = "gpt-3.5-turbo";
-            requestDoc["messages"] = prompt;
-            requestDoc["max_tokens"] = 100;
-            requestDoc["temperature"] = 0.7;
-            
-            // Serialize JSON to string
-            String requestBody;
-            serializeJson(requestDoc, requestBody);
-            
-            // Make POST request
-            int httpResponseCode = https.POST(requestBody);
-            
-            if (httpResponseCode > 0) {
-                response = https.getString();
-                
-                // Parse the response
-                JsonDocument responseDoc;
-                DeserializationError error = deserializeJson(responseDoc, response);
-                Serial.println(response);
-                if (!error) {
-                    // Extract the generated text from the response
-                    if (responseDoc["choices"][0]["text"]) {
-                        response = responseDoc["choices"][0]["text"].as<String>();
-                    } else {
-                        response = "Error: Unable to parse response choices";
-                    }
-                } else {
-                    response = "Error: JSON parsing failed";
-                }
-            } else {
-                response = "Error: HTTP request failed with code " + String(httpResponseCode);
-            }
-            
-            https.end();
-        } else {
-            response = "Error: Unable to connect to OpenAI API";
-        }
-    } else {
-        response = "Error: WiFi not connected";
+bool checkColorQuest(const String& color){
+    if (color == "red"){
+        return true
     }
-    
-    return response;
+    return false
 }
-
-            requestDoc["model"] = "gpt-3.5-turbo";
-            
-            // Create an array for messages
-            JsonArray messages = requestDoc.createNestedArray("messages");
-            
-            // Add user message to the messages array
-            JsonObject userMessage = messages.createNestedObject();
-            userMessage["role"] = "user";
-            userMessage["content"] = prompt;
-            
-            requestDoc["max_tokens"] = 100;
-            requestDoc["temperature"] = 0.7;
- */
 
 String callOpenAI(const String& prompt) {
     String response = "";
@@ -169,7 +139,7 @@ String callOpenAI(const String& prompt) {
             userMessage["role"] = "user";
             userMessage["content"] = prompt;
             
-            requestDoc["max_tokens"] = 100;
+            requestDoc["max_tokens"] = 400;
             requestDoc["temperature"] = 0.7;
             
             // Serialize JSON to string
@@ -212,7 +182,19 @@ String callOpenAI(const String& prompt) {
 }
 
 void setup() {
-    // Start the serial communication for debugging
+    Serial.begin(115200);
+    pinMode(S0, OUTPUT);
+    pinMode(S1, OUTPUT);
+    pinMode(S2, OUTPUT);
+    pinMode(S3, OUTPUT);
+    pinMode(OUT_PIN, INPUT);
+    // 
+    digitalWrite(S0, HIGH);
+    digitalWrite(S1, HIGH);
+    timer = timerBegin(0, 80, true);  // Timer 0, 分频80
+    timerAttachInterrupt(timer, &onTimer, true);  // 绑定中断服务函数
+    timerAlarmWrite(timer, 1000000, true);  // 1秒触发一次
+    timerAlarmEnable(timer);  // 启用定时器警报
     Serial.begin(115200);
 
     // Start the serial communication for GPS (D10=GPIO16 RX, D11=GPIO17 TX)
@@ -229,28 +211,39 @@ void setup() {
         delay(1000); // Wait 1 second before trying again.
         Serial.println("Connecting to Wi-Fi..."); // Print a message to the serial monitor.
     }
-    Serial.println("Connected to Wi-Fi"); // Print a message when successfully connected.
-    String response = callOpenAI("Please generate a 500 words long story for kids with the theme of futuristic");
+    Serial.println("Connected to Wi-Fi");
+    String response = callOpenAI("Please generate a 500 words long story for kids with the theme of futuristic, this story");
     Serial.println(response);
     // Configure wakeup source
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(SWITCH_PIN), 1);  // Wake up when switch is turned ON
 }
 
-void loop() {
 
-    // Check the state of the switch
-    bool currentSwitchState = digitalRead(SWITCH_PIN);
-    if (currentSwitchState == LOW) {
-        Serial.println("System is OFF, entering deep sleep");
-        delay(100);  // Small delay before sleep
-        esp_deep_sleep_start();  // Enter deep sleep
-    } else if (currentSwitchState == HIGH && !systemActive) {
-        systemActive = true;
-        Serial.println("System is ON");
+void colorChecking(){
+    Serial.print("Red: ");
+    if (redPulseCount > 0) {
+        Serial.print(1000000 / redPulseCount);
+    } else {
+        Serial.print("N/A");
     }
+    Serial.print("  Green: ");
+    if (greenPulseCount > 0) {
+        Serial.print(1000000 / greenPulseCount);
+    } else {
+        Serial.print("N/A");
+    }
+    Serial.print("  Blue: ");
+    if (bluePulseCount > 0) {
+        Serial.print(1000000 / bluePulseCount);
+    } else {
+        Serial.print("N/A");
+    }
+    Serial.println();
+    delay(1000);  
+}
 
-    // If the system is active, proceed with GPS reading and tone generation
-    if (systemActive) {
+void GPSturnOn(){
+     if (systemActive) {
         // Read data from GPS module
         while (SerialGPS.available() > 0) {
             gps.encode(SerialGPS.read());
@@ -269,8 +262,26 @@ void loop() {
         }
 
         // Play a short 1kHz tone over I2S, with breaks to ensure GPS can process data
-        generateTone();
     }
+}
+
+void loop() {
+
+    // Check the state of the switch
+    bool currentSwitchState = digitalRead(SWITCH_PIN);
+    if (currentSwitchState == LOW) {
+        Serial.println("System is OFF, entering deep sleep");
+        delay(100);  // Small delay before sleep
+        esp_deep_sleep_start();  // Enter deep sleep
+    } else if (currentSwitchState == HIGH && !systemActive) {
+        systemActive = true;
+        Serial.println("System is ON");
+    }
+    if(onQuest){
+        GPSturnOn();
+        olorChecking();
+    }
+   
 
     delay(100);  // Small delay to prevent excessive loop iteration
 }
