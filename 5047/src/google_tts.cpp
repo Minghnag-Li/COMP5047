@@ -343,7 +343,7 @@ String urlEncode(String str)
 #define I2S_LRCLK 12 // Left-Right Clock pin
 #define I2S_DIN 22   // Data Input pin
 
-bool pause = false;
+bool pause;
 bool requesting = false;
 
 WiFiClient *stream = nullptr;

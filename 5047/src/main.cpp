@@ -8,14 +8,11 @@
 #include <driver/i2s.h>
 #include <esp_sleep.h>
 #include <ArduinoJson.h>
-<<<<<<< HEAD
 #include <iostream>
 #include <string>
-=======
 #include <google_tts.h>
 #include <openai_api.h>
 
->>>>>>> f0a1c32a75822842f4dadaa6b18ca5ad1fce4c5d
 TinyGPSPlus gps;
 
 // Define hardware serial port for GPS
@@ -35,16 +32,15 @@ HardwareSerial SerialGPS(2);
 #define OUT_PIN 25
 
 bool systemActive = false;
-<<<<<<< HEAD
-bool onQuest = false;
-const char* ssid = "H"; //TODO: replace with wifi ssid
-const char* password = "88888889"; //TODO: replace with wifi password
+bool onQuest = true;
 
 const char* openai_api_key = "";
 const char* openai_url = "https://api.openai.com/v1/chat/completions";
+const char *ssid = "YUKARISAW";    // TODO: replace with wifi ssid
+const char *password = "88888889";
 WiFiClientSecure client;
 int player_num = 0;
-std::stringstream prompt;
+std::stringstream prompt = "";
 
 
 
@@ -72,10 +68,7 @@ void IRAM_ATTR onTimer() {
     bluePulseCount = pulseIn(OUT_PIN, LOW, 1000000);  // 读取脉冲
     currentColor = 0;  // 切换回红色
   }
-=======
-const char *ssid = "YUKARISAW";    // TODO: replace with wifi ssid
-const char *password = "88888889"; // TODO: replace with wifi password
->>>>>>> f0a1c32a75822842f4dadaa6b18ca5ad1fce4c5d
+}
 
 WiFiClient *streamClient;
 HTTPClient http;
@@ -122,12 +115,11 @@ void generateTone()
     }
 }
 
-<<<<<<< HEAD
 bool checkColorQuest(const String& color){
     if (color == "red"){
-        return true
+        return true;
     }
-    return false
+    return false;
 }
 
 String callOpenAI(const String& prompt) {
@@ -203,18 +195,14 @@ void setup() {
     pinMode(S2, OUTPUT);
     pinMode(S3, OUTPUT);
     pinMode(OUT_PIN, INPUT);
-    // 
     digitalWrite(S0, HIGH);
     digitalWrite(S1, HIGH);
     timer = timerBegin(0, 80, true);  // Timer 0, 分频80
     timerAttachInterrupt(timer, &onTimer, true);  // 绑定中断服务函数
     timerAlarmWrite(timer, 1000000, true);  // 1秒触发一次
     timerAlarmEnable(timer);  // 启用定时器警报
-=======
-void setup()
-{
+
     // Start the serial communication for debugging
->>>>>>> f0a1c32a75822842f4dadaa6b18ca5ad1fce4c5d
     Serial.begin(115200);
 
     // Start the serial communication for GPS (D10=GPIO16 RX, D11=GPIO17 TX)
@@ -242,16 +230,9 @@ void setup()
     setupI2S();
     // Configure switch pin
     pinMode(SWITCH_PIN, INPUT);
-<<<<<<< HEAD
-    WiFi.begin(ssid, password); // Begin the connection to the specified Wi-Fi network.
-    while (WiFi.status() != WL_CONNECTED) { // Check the connection status.
-        delay(1000); // Wait 1 second before trying again.
-        Serial.println("Connecting to Wi-Fi..."); // Print a message to the serial monitor.
-    }
-    Serial.println("Connected to Wi-Fi");
+   
     String response = callOpenAI("Please generate a 500 words long story for kids with the theme of futuristic, this story");
     Serial.println(response);
-=======
 
 
     // String response = callOpenAI("Please generate a 500 words long story for kids with the theme of futuristic");
@@ -321,35 +302,17 @@ The end.)";
 
     RequestBackendTTS(text);
 
->>>>>>> f0a1c32a75822842f4dadaa6b18ca5ad1fce4c5d
     // Configure wakeup source
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(SWITCH_PIN), 1); // Wake up when switch is turned ON
 }
 
-<<<<<<< HEAD
 
 void colorChecking(){
     Serial.print("Red: ");
     if (redPulseCount > 0) {
         Serial.print(1000000 / redPulseCount);
     } else {
-        Serial.print("N/A");
-=======
-void loop()
-{
-    // Check the state of the switch
-    bool currentSwitchState = digitalRead(SWITCH_PIN);
-    if (currentSwitchState == LOW)
-    {
-        Serial.println("System is OFF, entering deep sleep");
-        delay(100);             // Small delay before sleep
-        esp_deep_sleep_start(); // Enter deep sleep
-    }
-    else if (currentSwitchState == HIGH && !systemActive)
-    {
-        systemActive = true;
-        Serial.println("System is ON");
->>>>>>> f0a1c32a75822842f4dadaa6b18ca5ad1fce4c5d
+        Serial.println("N/A");
     }
     Serial.print("  Green: ");
     if (greenPulseCount > 0) {
@@ -367,14 +330,11 @@ void loop()
     delay(1000);  
 }
 
-<<<<<<< HEAD
 void GPSturnOn(){
      if (systemActive) {
-=======
     // If the system is active, proceed with GPS reading and tone generation
     if (systemActive)
     {
->>>>>>> f0a1c32a75822842f4dadaa6b18ca5ad1fce4c5d
         // Read data from GPS module
         while (SerialGPS.available() > 0)
         {
@@ -397,6 +357,7 @@ void GPSturnOn(){
         // Play a short 1kHz tone over I2S, with breaks to ensure GPS can process data
     }
 }
+}
 
 void loop() {
 
@@ -412,9 +373,8 @@ void loop() {
     }
     if(onQuest){
         GPSturnOn();
-        olorChecking();
+        colorChecking();
     }
-   
 
     delay(100); // Small delay to prevent excessive loop iteration
 }
