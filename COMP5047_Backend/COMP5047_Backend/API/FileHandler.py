@@ -1,10 +1,9 @@
 """Synthesizes speech from the input string of text."""
+import os.path
 import threading
 import urllib.parse
 import wave
 
-import numpy as np
-from django.db import connection
 from django.http import FileResponse, JsonResponse
 from google.cloud import texttospeech
 
@@ -59,6 +58,19 @@ def request_once(text, file_index):
         out.write(response.audio_content)
         TLogger.tlog(f"Audio content written to file output_{file_index}.wav")
 
+
+def request_premade(text, filename):
+    input_text = texttospeech.SynthesisInput(text=text)
+
+    response = client.synthesize_speech(
+        request={"input": input_text, "voice": voice, "audio_config": audio_config}
+    )
+
+    with open(f"{filename}.wav", "wb") as out:
+        out.write(response.audio_content)
+        TLogger.tlog(f"Premade audio content written to file {filename}.wav")
+
+
 def split_text(text):
     long_sentence = False
 
@@ -80,7 +92,6 @@ def split_text(text):
                 tt3s.append(tt3)
                 tt3 = ""
         return tt3s
-
 
     def split_text_by_comma(t1):
         long_clause = False
@@ -114,11 +125,14 @@ def split_text(text):
 
     return tt1s
 
+
 def url_encode(input_str):
     return urllib.parse.quote(input_str, safe='')
 
+
 def url_decode(encoded_str):
     return urllib.parse.unquote(encoded_str)
+
 
 def tts(request):
     try:
@@ -169,10 +183,43 @@ def tts(request):
         return get_json_response_result(FALSE)
 
 
-def get_tts_result(requset):
+def get_tts_result(request):
     try:
         TLogger.tlog(f"Return wav file")
         return FileResponse(open("output.wav", "rb"), as_attachment=True)
+    except Exception as e:
+        TLogger.terror(e)
+        return get_json_response_result(FALSE)
+
+
+def get_premade_result(request, text):
+    try:
+        TLogger.tlog(f"Got premade text: {text}")
+        match text:
+            case "story_start":
+                if not os.path.exists("story_start.wav"):
+                    request_premade("Story start!", "story_start")
+                return FileResponse(open("story_start.wav", "rb"), as_attachment=True)
+            case "quest_waiting":
+                if not os.path.exists("quest_waiting.wav"):
+                    request_premade("Quest waiting!", "quest_waiting")
+                return FileResponse(open("quest_waiting.wav", "rb"), as_attachment=True)
+            case "quest_done":
+                if not os.path.exists("quest_done.wav"):
+                    request_premade("Quest done!", "quest_done")
+                return FileResponse(open("quest_done.wav", "rb"), as_attachment=True)
+            case "story_end":
+                if not os.path.exists("story_end.wav"):
+                    request_premade("Story end!", "story_end")
+                return FileResponse(open("story_end.wav", "rb"), as_attachment=True)
+            case "quest_skipped":
+                if not os.path.exists("quest_skipped.wav"):
+                    request_premade("Quest skipped!", "quest_skipped")
+                return FileResponse(open("quest_skipped.wav", "rb"), as_attachment=True)
+            case _:
+                if not os.path.exists("undefined.wav"):
+                    request_premade("Undefined!", "undefined")
+                return FileResponse(open("undefined.wav", "rb"), as_attachment=True)
     except Exception as e:
         TLogger.terror(e)
         return get_json_response_result(FALSE)
