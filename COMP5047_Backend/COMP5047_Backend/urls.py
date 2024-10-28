@@ -22,4 +22,5 @@ import COMP5047_Backend.API.FileHandler
 urlpatterns = [
     path('tts', COMP5047_Backend.API.FileHandler.tts),
     path('tts/result', COMP5047_Backend.API.FileHandler.get_tts_result),
+    path('tts/premade/<str:text>', COMP5047_Backend.API.FileHandler.get_premade_result)
 ]

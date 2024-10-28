@@ -3,13 +3,19 @@
 
 #include <Arduino.h>
 
-extern bool bool_pause;
-extern bool requesting;
+// extern bool bool_pause;
+// extern bool requesting;
 
 extern WiFiClient *stream;
 extern size_t bytesRead;
 extern uint8_t buffer[512];
-extern HTTPClient http_tts_result;
+// extern HTTPClient http_tts_result;
+
+extern const uint8_t PREMADE_TTS_STORY_START = 0;
+extern const uint8_t PREMADE_TTS_QUEST_WAITING = 1;
+extern const uint8_t PREMADE_TTS_QUEST_DONE = 2;
+extern const uint8_t PREMADE_TTS_STORY_END = 3;
+extern const uint8_t PREMADE_TTS_QUEST_SKIPPED = 4;
 
 #pragma region Process_by_ESP32
 // void base64UrlEncode(const unsigned char *input, size_t length, String &output);
@@ -24,8 +30,9 @@ extern HTTPClient http_tts_result;
 #pragma endregion
 
 bool RequestBackendTTS(String &text);
-void EndHTTPTTSResult();
-void TTS_Pause();
-void TTS_Loop();
+bool RequestBackendPremadeTTS(uint8_t premade_tts_code);
+// void EndHTTPTTSResult();
+// void TTS_Pause();
+// void TTS_Loop();
 
 #endif  // GOOGLE_TTS_H

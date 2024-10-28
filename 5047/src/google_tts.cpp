@@ -13,13 +13,13 @@
 
 #include <driver/i2s.h>
 
-bool bool_pause = false;
-bool requesting = false;
+// bool bool_pause = false;
+// bool requesting = false;
 
 WiFiClient *stream = nullptr;
 size_t bytesRead;
 uint8_t buffer[512];
-HTTPClient http_tts_result;
+// HTTPClient http_tts_result;
 
 #pragma region Process_by_ESP32
 // // The private key of Google service account
@@ -184,7 +184,7 @@ HTTPClient http_tts_result;
 //         {
 //             "input": {
 //                 "text": ")" +
-//                          text + R"(" 
+//                          text + R"("
 //             },
 //             "voice": {
 //                 "languageCode": "en-US",
@@ -351,38 +351,38 @@ String urlEncode(String str)
     return encodedString;
 }
 
-void TTS_Pause()
-{
-    bool_pause = !bool_pause;
-}
+// void TTS_Pause()
+// {
+//     bool_pause = !bool_pause;
+// }
 
-void TTS_Loop()
-{
-    if (stream != nullptr and !bool_pause and !requesting)
-    {
-        if (stream->connected() && (bytesRead = stream->readBytes(buffer, sizeof(buffer))) > 0)
-        {
-            size_t bytes_written;
-            i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
-        }
-    }
-}
+// void TTS_Loop()
+// {
+//     if (stream != nullptr and !bool_pause and !requesting)
+//     {
+//         if (stream->connected() && (bytesRead = stream->readBytes(buffer, sizeof(buffer))) > 0)
+//         {
+//             size_t bytes_written;
+//             i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
+//         }
+//     }
+// }
 
-void EndHTTPTTSResult()
-{
-    http_tts_result.end();
-}
+// void EndHTTPTTSResult()
+// {
+//     http_tts_result.end();
+// }
 
 bool RequestBackendTTS(String &text)
 {
-    EndHTTPTTSResult();
+    // EndHTTPTTSResult();
 
     bool result = false;
 
     Serial.println("RequestBackendTTS using text: ");
-    // Serial.println(text);
+    Serial.println(text);
 
-    requesting = true;
+    // requesting = true;
 
     HTTPClient http;
     http.setConnectTimeout(60000);
@@ -393,22 +393,31 @@ bool RequestBackendTTS(String &text)
 
     if (httpCode == HTTP_CODE_OK)
     {
+        HTTPClient http_tts_result;
         http_tts_result.setConnectTimeout(60000);
         http_tts_result.setTimeout(60000);
         http_tts_result.begin("http://192.168.137.1:8000/tts/result");
-        
+
         int httpCode = http_tts_result.GET();
 
         if (httpCode == HTTP_CODE_OK)
         {
             stream = http_tts_result.getStreamPtr();
-            result = true;
+            // result = true;
+            while (stream->connected() && (bytesRead = stream->readBytes(buffer, sizeof(buffer))) > 0)
+            {
+                size_t bytes_written;
+                i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
+            }
         }
         else
         {
             Serial.printf("Failed to connect, HTTP code: %d\n", httpCode);
         }
 
+        http_tts_result.end();
+
+#pragma region obsolete
         // bool connect = audio.connecttohost("http://192.168.137.1:8000/tts/result");
         // if (connect) {
         //     Serial.println("Audio play start.");
@@ -421,14 +430,66 @@ bool RequestBackendTTS(String &text)
         // else {
         //     Serial.println("Audio play failed.");
         // }
+#pragma endregion
     }
     else
     {
         Serial.printf("Request tts api failed: %d\n", httpCode);
     }
     http.end();
-    requesting = false;
+    // requesting = false;
     return result;
+}
+
+bool RequestBackendPremadeTTS_(String &url)
+{
+    bool result = false;
+
+    HTTPClient http_tts_result;
+    http_tts_result.setConnectTimeout(60000);
+    http_tts_result.setTimeout(60000);
+    http_tts_result.begin(url);
+
+    int httpCode = http_tts_result.GET();
+
+    if (httpCode == HTTP_CODE_OK)
+    {
+        stream = http_tts_result.getStreamPtr();
+        while (stream->connected() && (bytesRead = stream->readBytes(buffer, sizeof(buffer))) > 0)
+        {
+            size_t bytes_written;
+            i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
+        }
+        result = true;
+    }
+    else
+    {
+        Serial.printf("RequestBackendPremadeTTS_ failed, HTTP code: %d\n", httpCode);
+    }
+
+    http_tts_result.end();
+    return result;
+}
+
+bool RequestBackendPremadeTTS(uint8_t premade_tts_code)
+{
+    String url = "http://192.168.137.1:8000/tts/premade/";
+    switch (premade_tts_code)
+    {
+    case PREMADE_TTS_STORY_START:
+        url += "story_start";
+    case PREMADE_TTS_QUEST_WAITING:
+        url += "quest_waiting";
+    case PREMADE_TTS_QUEST_DONE:
+        url += "quest_done";
+    case PREMADE_TTS_STORY_END:
+        url += "story_end";
+    case PREMADE_TTS_QUEST_SKIPPED:
+        url += "quest_skipped";
+    default:
+        url += "undefined";
+    }
+    return RequestBackendPremadeTTS_(url);
 }
 
 // void AudioLoop()
