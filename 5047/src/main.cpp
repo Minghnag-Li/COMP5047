@@ -12,24 +12,14 @@
 #include <string>
 #include <google_tts.h>
 #include <openai_api.h>
+#include <global.h>
 
 TinyGPSPlus gps;
 
 // Define hardware serial port for GPS
 HardwareSerial SerialGPS(2);
 
-// I2S pins for ESP32 (for the MAX98357A amplifier)
-#define I2S_BCLK 4   // Bit Clock pin
-#define I2S_LRCLK 12 // Left-Right Clock pin
-#define I2S_DIN 22   // Data Input pin
 
-#define SWITCH_PIN 35
-
-#define S0 13
-#define S1 14
-#define S2 0
-#define S3 26
-#define OUT_PIN 25
 
 bool systemActive = false;
 bool onQuest = true;
@@ -134,6 +124,74 @@ bool checkColorQuest(const String& color){
     return false;
 }
 
+#pragma region callOpenAI
+// String callOpenAI(const String& prompt) {
+//     String response = "";
+//     if (WiFi.status() == WL_CONNECTED) {
+//         // Disable SSL certificate verification
+//         client.setInsecure();
+        
+//         HTTPClient https;
+        
+//         // Initialize HTTPS client with WiFiClientSecure
+//         if (https.begin(client, openai_url)) {
+//             // Add headers
+//             https.addHeader("Content-Type", "application/json");
+//             https.addHeader("Authorization", String("Bearer ") + openai_api_key);
+            
+//             // Create JSON document for the request
+//             JsonDocument requestDoc;
+//             requestDoc["model"] = "gpt-3.5-turbo";
+            
+//             JsonArray messages = requestDoc.createNestedArray("messages");
+            
+//             JsonObject userMessage = messages.createNestedObject();
+//             userMessage["role"] = "user";
+//             userMessage["content"] = prompt;
+            
+//             requestDoc["max_tokens"] = 400;
+//             requestDoc["temperature"] = 0.7;
+            
+//             // Serialize JSON to string
+//             String requestBody;
+//             serializeJson(requestDoc, requestBody);
+            
+//             // Make POST request
+//             int httpResponseCode = https.POST(requestBody);
+            
+//             if (httpResponseCode > 0) {
+//                 response = https.getString();
+                
+//                 // Parse the response
+//                 JsonDocument responseDoc;
+//                 DeserializationError error = deserializeJson(responseDoc, response);
+//                 Serial.println(response);
+//                 if (!error) {
+//                     // Extract the generated text from the response
+//                     if (responseDoc["choices"][0]["text"]) {
+//                         response = responseDoc["choices"][0]["text"].as<String>();
+//                     } else {
+//                         response = "Error: Unable to parse response choices";
+//                     }
+//                 } else {
+//                     response = "Error: JSON parsing failed";
+//                 }
+//             } else {
+//                 response = "Error: HTTP request failed with code " + String(httpResponseCode);
+//             }
+            
+//             https.end();
+//         } else {
+//             response = "Error: Unable to connect to OpenAI API";
+//         }
+//     } else {
+//         response = "Error: WiFi not connected";
+//     }
+    
+//     return response;
+// }
+
+#pragma endregion
 
 void setup() {
     Serial.begin(115200);
