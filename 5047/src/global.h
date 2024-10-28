@@ -7,8 +7,9 @@
 #define I2S_DIN 22   // Data Input pin
 
 #define SWITCH_PIN 35
+#define PUSH_PIN 34
 
-#define S0 13
+#define S0 13 
 #define S1 14
 #define S2 0
 #define S3 26
