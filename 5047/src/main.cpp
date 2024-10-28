@@ -13,48 +13,54 @@
 #include <google_tts.h>
 #include <openai_api.h>
 #include <global.h>
+#include <iostream>
+#include <sstream>
 
 TinyGPSPlus gps;
 
 // Define hardware serial port for GPS
 HardwareSerial SerialGPS(2);
-
-
-
+//timestamps
+int player_num_time_stamp = 0;
+int quest_time_stamp = 0;
+//push button vars
+int buttonState = LOW;
+int newButtonState = LOW;
+int buttonPressedTimeStamp = 0;
+int debounceWindow = 40;
+int counted = 0;
+//bool var for device flow
+bool isWaitingForPlayerNum = true;
 bool systemActive = false;
-bool onQuest = true;
+bool player_num_button_pressed = false;
+bool isWaitingPlayerNumStart = false;
+bool isStoryTelling = false;
+bool isOnQuest = false;
+bool isWaitingForQuestCompletion = false;
 
+//color sensor vars
 volatile unsigned long redPulseCount = 0;
 volatile unsigned long greenPulseCount = 0;
 volatile unsigned long bluePulseCount = 0;
-// const char* openai_api_key = "";
-// const char* openai_url = "https://api.openai.com/v1/chat/completions";
-const char *ssid = "StephenPh";    // TODO: replace with wifi ssid
-const char *password = "Abcd@123";
-String textToTranserToTTS;
-// WiFiClientSecure client;
-int player_num = 0;
+
+//Wifi vars
+const char *ssid = "York148";    // TODO: replace with wifi ssid
+const char *password = "King33$$";
 WiFiClient *streamClient;
 HTTPClient http;
-String prompt = R"(Please generate a 1000 words story for kids from age 5 to 10, this text generated will: 
--Have a futuristic setting 
--Will have 2 number of main characters interacting with each others \n
--Will have at least 5 quests embbeded into the story line, you can add the quest anywhere you want during the story, there are 2 types of quest I want you to add: \n
-    -Find an object with color {either Red, Green or Blue} or Move a distance of {3m or 6m}. \n
--Important: There MUST have an asterisk token * after every quest introduction line and there MUST be NO token before the quest introduction line(like this: \n 
-One day, Luna and Orion decided to explore the city and see what adventures awaited them. As they walked down the bustling streets, they saw a sign that read: "The Great Robot Race - Winner 
-Receives a Golden Key to the City." Excited by the prospect of a challenge, Luna and Orion decided to enter the race. \n
-Find an object with color Blue *). \n
--No need to add new line (\n) character in the generated text. \n
--No need to add "Quest introduce" before introducing a quest and don't put it in curly braces.)";
+//TTS vars
+String textToTranserToTTS;
+
+int player_num = 0; //TODO: player number var here
+//AI API vars
+bool hasMadeAIAPIrequest = false;
+
                                 
 hw_timer_t *timer = NULL;
 
 
 void IRAM_ATTR onTimer() {
-    redPulseCount = 0;
-    greenPulseCount = 0; 
-    bluePulseCount = 0;
+
   static int currentColor = 0; // 0: Red, 1: Green, 2: Blue
   if (currentColor == 0) {
     digitalWrite(S2, LOW);
@@ -104,94 +110,7 @@ void setupI2S()
     i2s_set_clk(I2S_NUM_0, 24000, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO);
 }
 
-// Function to generate a 1kHz tone
-void generateTone()
-{
-    int16_t sample = 0;
-    size_t bytes_written;
 
-    for (int i = 0; i < 44100; i++)
-    {
-        sample = 5000 * sin(2 * PI * 1000 * i / 44100.0); // Generate 1kHz sine wave
-        i2s_write(I2S_NUM_0, &sample, sizeof(sample), &bytes_written, portMAX_DELAY);
-    }
-}
-
-bool checkColorQuest(const String& color){
-    if (color == "red"){
-        return true;
-    }
-    return false;
-}
-
-#pragma region callOpenAI
-// String callOpenAI(const String& prompt) {
-//     String response = "";
-//     if (WiFi.status() == WL_CONNECTED) {
-//         // Disable SSL certificate verification
-//         client.setInsecure();
-        
-//         HTTPClient https;
-        
-//         // Initialize HTTPS client with WiFiClientSecure
-//         if (https.begin(client, openai_url)) {
-//             // Add headers
-//             https.addHeader("Content-Type", "application/json");
-//             https.addHeader("Authorization", String("Bearer ") + openai_api_key);
-            
-//             // Create JSON document for the request
-//             JsonDocument requestDoc;
-//             requestDoc["model"] = "gpt-3.5-turbo";
-            
-//             JsonArray messages = requestDoc.createNestedArray("messages");
-            
-//             JsonObject userMessage = messages.createNestedObject();
-//             userMessage["role"] = "user";
-//             userMessage["content"] = prompt;
-            
-//             requestDoc["max_tokens"] = 400;
-//             requestDoc["temperature"] = 0.7;
-            
-//             // Serialize JSON to string
-//             String requestBody;
-//             serializeJson(requestDoc, requestBody);
-            
-//             // Make POST request
-//             int httpResponseCode = https.POST(requestBody);
-            
-//             if (httpResponseCode > 0) {
-//                 response = https.getString();
-                
-//                 // Parse the response
-//                 JsonDocument responseDoc;
-//                 DeserializationError error = deserializeJson(responseDoc, response);
-//                 Serial.println(response);
-//                 if (!error) {
-//                     // Extract the generated text from the response
-//                     if (responseDoc["choices"][0]["text"]) {
-//                         response = responseDoc["choices"][0]["text"].as<String>();
-//                     } else {
-//                         response = "Error: Unable to parse response choices";
-//                     }
-//                 } else {
-//                     response = "Error: JSON parsing failed";
-//                 }
-//             } else {
-//                 response = "Error: HTTP request failed with code " + String(httpResponseCode);
-//             }
-            
-//             https.end();
-//         } else {
-//             response = "Error: Unable to connect to OpenAI API";
-//         }
-//     } else {
-//         response = "Error: WiFi not connected";
-//     }
-    
-//     return response;
-// }
-
-#pragma endregion
 
 void setup() {
     Serial.begin(115200);
@@ -200,6 +119,8 @@ void setup() {
     pinMode(S2, OUTPUT);
     pinMode(S3, OUTPUT);
     pinMode(OUT_PIN, INPUT);
+    pinMode(PUSH_PIN, INPUT);
+    digitalWrite(PUSH_PIN, HIGH);
     digitalWrite(S0, HIGH);
     digitalWrite(S1, HIGH);
     timer = timerBegin(0, 80, true);  // Timer 0, 分频80
@@ -236,21 +157,84 @@ void setup() {
     // Configure switch pin
     pinMode(SWITCH_PIN, INPUT);
    
-    textToTranserToTTS = callOpenAI(prompt);
-    Serial.println(textToTranserToTTS);
-
-    SetAudioConfig(I2S_BCLK, I2S_LRCLK, I2S_DIN);
+    //SetAudioConfig(I2S_BCLK, I2S_LRCLK, I2S_DIN);
 
 
-    bool result = RequestBackendTTS(textToTranserToTTS);
+    //bool result = RequestBackendTTS(textToTranserToTTS);
     
-    Serial.println("RequestBackendTTS result: ");
-    Serial.println(result);
+    //Serial.println("RequestBackendTTS result: ");
+    //Serial.println(result);
 
     // Configure wakeup source
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(SWITCH_PIN), 1); // Wake up when switch is turned ON
 }
 
+
+bool checkColorQuest(const String& color){
+    if (color == "red"){
+        return true;
+    }
+    return false;
+}
+
+std::string generatePrompt(int player_num) {
+    std::ostringstream oss;
+    oss << R"(Please generate a 1000 words story for kids from age 5 to 10, this text generated will strictly follow these requirements: 
+-Have a futuristic setting 
+-Will have )" << player_num << R"( number of main characters interacting with each other
+-Will have at least 5 quests embedded into the story line, there are 2 types of quest I want you to add: 
+    -Find an object with color {either Red, Green or Blue} or Move a distance of {3m or 6m}.
+-Important: There MUST have an asterisk token *(1, 2 or 3 regarding red, green or blue) after every color finding quest and $(1 or 2 regarding 3m or 6m) for moving a distance quest introduction line, DO NOT PUT any token (*, $) before the quest introduction line (like this example: 
+One day, Luna and Orion decided to explore the city and see what adventures awaited them. As they walked down the bustling streets, they saw a sign that read: "The Great Robot Race - Winner 
+Receives a Golden Key to the City." Excited by the prospect of a challenge, Luna and Orion decided to enter the race.
+Find an object with color Blue *(3)  ).
+-No need to add "Quest introduce" before introducing a quest and don't put it in curly braces.)";
+    return oss.str();
+}
+
+//read button clicks and set player number
+void setPlayerNum() {
+    //read button clicks and set player number
+    newButtonState = digitalRead(PUSH_PIN);
+    if (newButtonState != buttonState){
+        buttonPressedTimeStamp = millis();
+        counted = 0;
+    }
+    if (millis() - buttonPressedTimeStamp >= debounceWindow){
+        if(newButtonState == HIGH && counted == 0){
+            player_num_button_pressed = true;
+            if(player_num < 3){
+                player_num ++;
+                counted = 1;
+            }else{
+               player_num = 0;
+               counted = 1; 
+            }
+            
+        }
+    }
+    buttonState = newButtonState;
+}
+//Timer methods 
+void waitTimerForPlayerNumInput(){
+    //A Timer for waiting for player number input from user (20s)
+    if (!isWaitingPlayerNumStart){
+        player_num_time_stamp = millis();
+        isWaitingPlayerNumStart = true;
+    }
+    if (millis() - player_num_time_stamp >= 20000){
+        isWaitingForPlayerNum = false;
+    }
+}
+void waitTimerForQuest(){
+    //A Timer for waiting for quest to be completed by user (60s)
+    if(!isWaitingForQuestCompletion){
+        quest_time_stamp = millis();
+        isWaitingForQuestCompletion = true;
+    }if(millis() - quest_time_stamp >= 60000){
+        isWaitingForQuestCompletion = false;
+    }
+}
 int getRandom123() {
     // Seed the random number generator with the current time
     static std::random_device rd;  // Non-deterministic random number
@@ -262,7 +246,7 @@ int getRandom123() {
 }
 
 void colorChecking(int random_color){
-
+    
     Serial.print("Red: ");
     if (redPulseCount > 0) {
         Serial.print(1000000 / redPulseCount);
@@ -310,11 +294,8 @@ void GPSturnOn(){
     }
 }
 
-
-void loop() {
-
-    // Check if the program start
-
+void checkSystemTurnOn(){
+    //Check if system turning on or off base on the signal read from switch button
     bool currentSwitchState = digitalRead(SWITCH_PIN);
     if (currentSwitchState == LOW) {
         Serial.println("System is OFF, entering deep sleep");
@@ -324,19 +305,137 @@ void loop() {
         systemActive = true;
         Serial.println("System is ON");
     }
-    //execute everything down here if ON
-    if(player_num > 0) {
-        //Put the player_num into the request body to send AI
-        //Send request to AI
-        //Get the story from AI
-        //Send the text to Django backend
-        //Django backend will generate voice file
-        //Django backend send voice files to this module
-        //
+}
 
+const int MAX_PARTS = 30; 
+
+int splitStringWithTokens(const String& text, String result[], int maxParts) {
+    int currentIndex = 0;
+    int start = 0;
+
+    // Loop until no more tokens are found, and ensure we don't exceed maxParts
+    while (currentIndex < maxParts - 1) {
+        int asteriskPos = text.indexOf('*', start);
+        int dollarPos = text.indexOf('$', start);
+
+        // Find the nearest token position
+        int nextTokenPos = -1;
+        char token = '\0';
+
+        if (asteriskPos != -1 && (dollarPos == -1 || asteriskPos < dollarPos)) {
+            nextTokenPos = asteriskPos;
+            token = '*';
+        } else if (dollarPos != -1) {
+            nextTokenPos = dollarPos;
+            token = '$';
+        }
+
+        // Break if no more tokens are found
+        if (nextTokenPos == -1) {
+            break;
+        }
+
+        // Add the text before the token to the result array, if there's any
+        if (nextTokenPos > start && currentIndex < maxParts) {
+            result[currentIndex++] = text.substring(start, nextTokenPos);
+        }
+
+        // Add the token itself as a separate element
+        if (currentIndex < maxParts) {
+            result[currentIndex++] = String(token);
+        }
+
+        // Check if a number follows in the format (1), (2), or (3)
+        if (nextTokenPos + 2 < text.length() && text[nextTokenPos + 1] == '(' &&
+            (text[nextTokenPos + 2] == '1' || text[nextTokenPos + 2] == '2' || text[nextTokenPos + 2] == '3') &&
+            text[nextTokenPos + 3] == ')') {
+
+            // Add the number part as a separate element
+            if (currentIndex < maxParts) {
+                result[currentIndex++] = text.substring(nextTokenPos + 1, nextTokenPos + 4); // e.g., "(1)"
+            }
+            start = nextTokenPos + 4; // Move past the token and the number
+        } else {
+            start = nextTokenPos + 1; // Move past the token if no number follows
+        }
     }
 
-   
+    // Add the last segment after the final token, if there's space
+    if (start < text.length() && currentIndex < maxParts) {
+        result[currentIndex++] = text.substring(start);
+    }
 
-    delay(100); // Small delay to prevent excessive loop iteration
+    return currentIndex; // Returns the number of parts in the result array
 }
+
+
+void loop() {
+    //timer for 30s if timer done and player hasn't pressed the button, the program end.
+    waitTimerForPlayerNumInput();
+    //check if the player has pressed the input and set the player num if they have
+    setPlayerNum();
+    
+    if(!player_num_button_pressed && !isWaitingForPlayerNum){
+        if(player_num <= 0) {
+        Serial.println("System will be off because player didn't set player num");
+        esp_deep_sleep_start();
+        }
+    }else if (!isWaitingForPlayerNum){
+        systemActive = true;
+        if(!hasMadeAIAPIrequest){
+            Serial.println("-----------------Making request to AI");
+            //if haven't made a request to AI, make a request to get a story
+            //then send the story to tts module
+            textToTranserToTTS = callOpenAI(String(generatePrompt(player_num).c_str()));
+            Serial.println(textToTranserToTTS);
+            Serial.println("-----------------Transfer text to TTS");
+            String parts[MAX_PARTS];
+            //split the response string with * as delimeter and include * as a separate element
+            int numParts = splitStringWithTokens(textToTranserToTTS, parts, MAX_PARTS);
+            Serial.println("Split parts:");
+            Serial.println("These string will be feed to TTS, needs to be cleaned of tokens");
+            for (int i = 0; i < numParts; ++i) {
+                if (parts[i] != "*" && 
+                    parts[i] != "$" &&
+                    parts[i] != "(1)" &&
+                    parts[i] != "(2)" &&
+                    parts[i] != "(3)"){
+                    isOnQuest = false;
+                    isStoryTelling = true;
+                    //if not isOnQuest and isStoryTelling
+                    //transportTextToTTS(parts[i]); 
+                    Serial.println(i);
+                    Serial.println(parts[i]);
+                    //This run inside loop() so it needs something to restrain the frequency of request sending to TTS module
+                }else{
+                    isOnQuest = true;
+                    isStoryTelling = false;
+                    if (parts[i] == "*"){
+                        //detect color quest
+                        if (parts[i+1] == "(1)"){
+                            //red
+                        }else if(parts[i+1] == "(2)"){
+                            //green
+                        }else if(parts[i+1] == "(3)"){
+                            //blue
+                        }
+                        //this is when the story telling needs to stop and quest handling will kick in
+                        
+                    }else if (parts[i] == "$") {
+                        //detect movement quest
+                        if (parts[i+1] == "(1)"){
+                            //3m
+                        }else if(parts[i+1] == "(2)"){
+                            //6m
+                        }
+                    }
+                }  
+            }
+            hasMadeAIAPIrequest = true;
+        }else{
+           
+        }
+    }
+    delay(100);
+}
+
