@@ -34,27 +34,42 @@ HardwareSerial SerialGPS(2);
 bool systemActive = false;
 bool onQuest = true;
 
-// const char* openai_api_key = "";
-// const char* openai_url = "https://api.openai.com/v1/chat/completions";
-const char *ssid = "YUKARISAW";    // TODO: replace with wifi ssid
-const char *password = "88888889";
-// WiFiClientSecure client;
-int player_num = 0;
-
-
-
 volatile unsigned long redPulseCount = 0;
 volatile unsigned long greenPulseCount = 0;
 volatile unsigned long bluePulseCount = 0;
+// const char* openai_api_key = "";
+// const char* openai_url = "https://api.openai.com/v1/chat/completions";
+const char *ssid = "StephenPh";    // TODO: replace with wifi ssid
+const char *password = "Abcd@123";
+String textToTranserToTTS;
+// WiFiClientSecure client;
+int player_num = 0;
+WiFiClient *streamClient;
+HTTPClient http;
+String prompt = R"(Please generate a 1000 words story for kids from age 5 to 10, this text generated will: 
+-Have a futuristic setting 
+-Will have 2 number of main characters interacting with each others \n
+-Will have at least 5 quests embbeded into the story line, you can add the quest anywhere you want during the story, there are 2 types of quest I want you to add: \n
+    -Find an object with color {either Red, Green or Blue} or Move a distance of {3m or 6m}. \n
+-Important: There MUST have an asterisk token * after every quest introduction line and there MUST be NO token before the quest introduction line(like this: \n 
+One day, Luna and Orion decided to explore the city and see what adventures awaited them. As they walked down the bustling streets, they saw a sign that read: "The Great Robot Race - Winner 
+Receives a Golden Key to the City." Excited by the prospect of a challenge, Luna and Orion decided to enter the race. \n
+Find an object with color Blue *). \n
+-No need to add new line (\n) character in the generated text. \n
+-No need to add "Quest introduce" before introducing a quest and don't put it in curly braces.)";
+                                
 hw_timer_t *timer = NULL;
 
 
 void IRAM_ATTR onTimer() {
+    redPulseCount = 0;
+    greenPulseCount = 0; 
+    bluePulseCount = 0;
   static int currentColor = 0; // 0: Red, 1: Green, 2: Blue
   if (currentColor == 0) {
     digitalWrite(S2, LOW);
     digitalWrite(S3, LOW);
-    redPulseCount = pulseIn(OUT_PIN, LOW, 1000000);  // 读取脉冲
+    redPulseCount = pulseIn(OUT_PIN, LOW, 1000000);  
     currentColor = 1;  // 切换到绿色
   } else if (currentColor == 1) {
     digitalWrite(S2, HIGH);
@@ -69,8 +84,6 @@ void IRAM_ATTR onTimer() {
   }
 }
 
-WiFiClient *streamClient;
-HTTPClient http;
 
 // Function to configure I2S for audio
 void setupI2S()
@@ -121,71 +134,6 @@ bool checkColorQuest(const String& color){
     return false;
 }
 
-// String callOpenAI(const String& prompt) {
-//     String response = "";
-//     if (WiFi.status() == WL_CONNECTED) {
-//         // Disable SSL certificate verification
-//         client.setInsecure();
-        
-//         HTTPClient https;
-        
-//         // Initialize HTTPS client with WiFiClientSecure
-//         if (https.begin(client, openai_url)) {
-//             // Add headers
-//             https.addHeader("Content-Type", "application/json");
-//             https.addHeader("Authorization", String("Bearer ") + openai_api_key);
-            
-//             // Create JSON document for the request
-//             JsonDocument requestDoc;
-//             requestDoc["model"] = "gpt-3.5-turbo";
-            
-//             JsonArray messages = requestDoc.createNestedArray("messages");
-            
-//             JsonObject userMessage = messages.createNestedObject();
-//             userMessage["role"] = "user";
-//             userMessage["content"] = prompt;
-            
-//             requestDoc["max_tokens"] = 400;
-//             requestDoc["temperature"] = 0.7;
-            
-//             // Serialize JSON to string
-//             String requestBody;
-//             serializeJson(requestDoc, requestBody);
-            
-//             // Make POST request
-//             int httpResponseCode = https.POST(requestBody);
-            
-//             if (httpResponseCode > 0) {
-//                 response = https.getString();
-                
-//                 // Parse the response
-//                 JsonDocument responseDoc;
-//                 DeserializationError error = deserializeJson(responseDoc, response);
-//                 Serial.println(response);
-//                 if (!error) {
-//                     // Extract the generated text from the response
-//                     if (responseDoc["choices"][0]["text"]) {
-//                         response = responseDoc["choices"][0]["text"].as<String>();
-//                     } else {
-//                         response = "Error: Unable to parse response choices";
-//                     }
-//                 } else {
-//                     response = "Error: JSON parsing failed";
-//                 }
-//             } else {
-//                 response = "Error: HTTP request failed with code " + String(httpResponseCode);
-//             }
-            
-//             https.end();
-//         } else {
-//             response = "Error: Unable to connect to OpenAI API";
-//         }
-//     } else {
-//         response = "Error: WiFi not connected";
-//     }
-    
-//     return response;
-// }
 
 void setup() {
     Serial.begin(115200);
@@ -230,76 +178,13 @@ void setup() {
     // Configure switch pin
     pinMode(SWITCH_PIN, INPUT);
    
-    String response = callOpenAI("Please generate a 500 words long story for kids with the theme of futuristic, this story");
-    Serial.println(response);
+    textToTranserToTTS = callOpenAI(prompt);
+    Serial.println(textToTranserToTTS);
+
+    SetAudioConfig(I2S_BCLK, I2S_LRCLK, I2S_DIN);
 
 
-    // String response = callOpenAI("Please generate a 500 words long story for kids with the theme of futuristic");
-    // Serial.println(response);
-
-    // SetAudioConfig(I2S_BCLK, I2S_LRCLK, I2S_DIN);
-
-    String text = R"(Once upon a time, in a village at the edge of the Whispering Woods, there was a little girl named Lila. She had sparkling eyes, a wild, adventurous heart, and a great love for the colors of the world. But among all the colors, her favorite was the rainbow. She loved the way each color blended into the next, creating a bridge between the earth and the sky.
-
-One sunny day after a rain shower, Lila ran outside to spot the rainbow. She gasped with excitement and searched the skies. But to her surprise, there was no rainbow! The sky was clear, and all she could see were puffy white clouds. She waited and waited, but the rainbow never appeared.
-
-Confused, Lila went to see her friend, Grandma Willow. Grandma Willow was the oldest, wisest woman in the village, and everyone trusted her. Her hair was like silver strands of moonlight, and her smile was warm as summer.
-
-“Grandma Willow, where is the rainbow?” Lila asked. “The rain has stopped, the sun is shining, but there’s no rainbow!”
-
-Grandma Willow closed her eyes and felt the breeze. She listened to the whispers in the wind, then opened her eyes wide. “Oh, dear Lila,” she said, “I believe the rainbow has gone missing!”
-
-Lila’s eyes widened. “Missing? But how can a rainbow just disappear?”
-
-Grandma Willow took her hand and led her to the edge of the Whispering Woods. “If the rainbow is missing, then it must be lost in the Magic Lands,” she said. “The Magic Lands are places only brave hearts can visit. But be careful, for each color of the rainbow has its own spirit, and they may not be so easily convinced to return.”
-
-Lila’s heart was pounding with excitement. “I’ll bring back the rainbow, Grandma Willow! I promise!”
-
-And with that, Lila stepped into the Whispering Woods, guided by the songs of the trees.
-
-The first color she came upon was red. It was a fiery, lively spirit that danced like a flame, crackling with energy. “Why have you come to find me?” Red asked, its voice bold and strong.
-
-“I need to bring you back to the rainbow,” Lila said. “Without you, the world has lost its colors.”
-
-Red laughed a deep, rumbling laugh. “If you want me to return, show me your bravery!”
-
-Just then, a wild storm brewed in front of her. Lightning crackled, and thunder roared. Lila took a deep breath and marched through the storm without looking back, proving her bravery. When she turned around, Red was by her side.
-
-Next, she met Orange, who shimmered like a warm, setting sun. “I am the spirit of creativity and joy. To bring me back, you must make something beautiful.”
-
-Lila thought for a moment, then gathered leaves, twigs, and flowers. She crafted a small crown and placed it on her head, dancing and spinning with joy. Orange chuckled with delight and decided to join her.
-
-They moved forward, and soon, Lila found Yellow hiding in a field of golden flowers. Yellow glowed with a soft, gentle warmth. “I am the color of hope and light. To bring me back, you must prove you have a heart full of kindness.”
-
-Just then, Lila noticed a tiny bird trapped in some thorny vines. She carefully freed the little bird, who chirped gratefully and flew away. Yellow smiled and joined her.
-
-Green was next, and it appeared as a lush, wise tree with deep emerald leaves. “I am the spirit of nature and growth. To bring me back, you must show me you care for all living things.”
-
-Lila knelt by a small, wilting plant and gently poured water over it from her canteen. She whispered, “Grow strong and tall, little plant,” and with that, Green was satisfied and joined her.
-
-Blue was waiting in a peaceful lake, glimmering like a calm sea. “I am the spirit of calm and truth. To bring me back, show me your honesty.”
-
-Lila nodded and told Blue about a time she had been afraid to admit she’d broken a vase at home. “But I told the truth,” she said, “even though it was hard.” Blue’s smile was calm, and it floated beside her, adding its color to the journey.
-
-Finally, she reached the purple color, shimmering like a magical mist. Purple was the spirit of mystery and wisdom, and it looked at her with knowing eyes. “If you want me to come back,” Purple said, “you must tell me what you’ve learned on this journey.”
-
-Lila thought carefully. “I’ve learned that every color is special. Each has its own beauty, and the rainbow wouldn’t be complete without every single one.”
-
-Purple smiled and nodded, joining her.
-
-With all the colors by her side, Lila felt a warmth glowing in her heart. They traveled together, and as they reached the edge of the Whispering Woods, the colors began to swirl and mix, forming a brilliant rainbow in the sky. Lila watched in awe as it stretched from one end of the village to the other, shining brighter than ever.
-
-The villagers cheered and celebrated the return of the rainbow, and Grandma Willow hugged Lila with pride.
-
-From that day on, Lila became known as the Guardian of Colors, and every time a rainbow appeared, people would remember the brave little girl who brought it back.
-
-And in her heart, Lila knew that even when things seemed lost, sometimes all it took was a little bravery, kindness, and belief in oneself to bring back the colors of the world.
-
-The end.)";
-
-    // String text = "We are going to pass pervasive computing.";
-
-    bool result = RequestBackendTTS(text);
+    bool result = RequestBackendTTS(textToTranserToTTS);
     
     Serial.println("RequestBackendTTS result: ");
     Serial.println(result);
@@ -308,8 +193,18 @@ The end.)";
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(SWITCH_PIN), 1); // Wake up when switch is turned ON
 }
 
+int getRandom123() {
+    // Seed the random number generator with the current time
+    static std::random_device rd;  // Non-deterministic random number
+    static std::mt19937 gen(rd()); // Mersenne Twister engine seeded with rd()
+    static std::uniform_int_distribution<int> dist(1, 3); // Range [1, 3]
+    delay(1000);
+    return dist(gen); // Generate a random number in the range 1 to 3
 
-void colorChecking(){
+}
+
+void colorChecking(int random_color){
+
     Serial.print("Red: ");
     if (redPulseCount > 0) {
         Serial.print(1000000 / redPulseCount);
@@ -333,7 +228,6 @@ void colorChecking(){
 }
 
 void GPSturnOn(){
-     if (systemActive) {
     // If the system is active, proceed with GPS reading and tone generation
     if (systemActive)
     {
@@ -355,15 +249,14 @@ void GPSturnOn(){
             Serial.print("Satellites: ");
             Serial.println(gps.satellites.value());
         }
-
-        // Play a short 1kHz tone over I2S, with breaks to ensure GPS can process data
     }
 }
-}
+
 
 void loop() {
 
-    // Check the state of the switch
+    // Check if the program start
+
     bool currentSwitchState = digitalRead(SWITCH_PIN);
     if (currentSwitchState == LOW) {
         Serial.println("System is OFF, entering deep sleep");
@@ -373,10 +266,19 @@ void loop() {
         systemActive = true;
         Serial.println("System is ON");
     }
-    if(onQuest){
-        GPSturnOn();
-        colorChecking();
+    //execute everything down here if ON
+    if(player_num > 0) {
+        //Put the player_num into the request body to send AI
+        //Send request to AI
+        //Get the story from AI
+        //Send the text to Django backend
+        //Django backend will generate voice file
+        //Django backend send voice files to this module
+        //
+
     }
+
+   
 
     delay(100); // Small delay to prevent excessive loop iteration
 }
