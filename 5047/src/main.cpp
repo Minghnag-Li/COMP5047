@@ -59,32 +59,25 @@ int player_num = 0; // TODO: player number var here
 bool hasMadeAIAPIrequest = false;
 
 hw_timer_t *timer = NULL;
-
+int frequency = 0;
 void IRAM_ATTR onTimer()
 {
-
-    static int currentColor = 0; // 0: Red, 1: Green, 2: Blue
-    if (currentColor == 0)
-    {
+        //redd
         digitalWrite(S2, LOW);
         digitalWrite(S3, LOW);
-        redPulseCount = pulseIn(OUT_PIN, LOW, 1000000);
-        currentColor = 1; // 切换到绿色
-    }
-    else if (currentColor == 1)
-    {
+        frequency = pulseIn(OUT_PIN, LOW);
+        //green
+        delay(100);
         digitalWrite(S2, HIGH);
         digitalWrite(S3, HIGH);
-        greenPulseCount = pulseIn(OUT_PIN, LOW, 1000000); // 读取脉冲
-        currentColor = 2;                                 // 切换到蓝色
-    }
-    else if (currentColor == 2)
-    {
+        frequency = pulseIn(OUT_PIN, LOW); // 读取脉冲
+        //blue
+        
+        delay(100);
         digitalWrite(S2, LOW);
         digitalWrite(S3, HIGH);
-        bluePulseCount = pulseIn(OUT_PIN, LOW, 1000000); // 读取脉冲
-        currentColor = 0;                                // 切换回红色
-    }
+        frequency = pulseIn(OUT_PIN, LOW);
+ 
 }
 
 // Function to configure I2S for audio
@@ -127,15 +120,16 @@ void setup()
     pinMode(PUSH_PIN, INPUT);
     pinMode(CS_LED_PIN, OUTPUT);
     //turn on CS LED
+    
     digitalWrite(CS_LED_PIN, HIGH);
 
     digitalWrite(PUSH_PIN, HIGH);
     digitalWrite(S0, HIGH);
-    digitalWrite(S1, HIGH);
-    timer = timerBegin(0, 80, true);             // Timer 0, prescaler 80
-    timerAttachInterrupt(timer, &onTimer, true); // Attach interrupt
-    timerAlarmWrite(timer, 1000000, true);       // Set alarm to trigger every 1 second
-    timerAlarmEnable(timer);   
+    digitalWrite(S1,LOW);
+    //timer = timerBegin(0, 80, true);             // Timer 0, prescaler 80
+    //timerAttachInterrupt(timer, &onTimer, true); // Attach interrupt
+    //timerAlarmWrite(timer, 1000000, true);       // Set alarm to trigger every 1 second
+   //timerAlarmEnable(timer);   
 
     // Start the serial communication for debugging
     Serial.begin(115200);
@@ -240,7 +234,7 @@ void waitTimerForQuest()
         isWaitingForQuestCompletion = true;
         RequestBackendPremadeTTS(PREMADE_TTS_QUEST_WAITING);
     }
-    if (millis() - quest_time_stamp >= 20000)
+    if (millis() - quest_time_stamp >= 30000)
     {
         Serial.println("Skipping Quest");
         isWaitingForQuestCompletion = false;
@@ -255,50 +249,62 @@ int blueValue = 0;
 
 bool colorChecking(int random_color)
 {
-    Serial.print("  Red: ");
-    if (redPulseCount > 0)
-    {
-        redValue = 1000000 / redPulseCount;
-    }
-    else
-    {
-        Serial.println("N/A");
-    }
-    Serial.print("  Green: ");
-    if (greenPulseCount > 0)
-    {
-        greenValue = 1000000 / greenPulseCount;
-    }
-    else
-    {
-        Serial.print("N/A");
-    }
-    Serial.print("  Blue: ");
-    if (bluePulseCount > 0)
-    {
-        blueValue=  1000000 / bluePulseCount;
-    }else
-    {
-        Serial.print("N/A");
-    }
 
+    digitalWrite(S2,LOW);
+    digitalWrite(S3, LOW);
+    frequency = pulseIn(OUT_PIN, LOW);
+    Serial.print("R= ");
+    redValue = frequency;
+    Serial.print(frequency);
+    Serial.print(" ");
+
+    delay(100);
+
+    digitalWrite(S2,HIGH);
+    digitalWrite(S3, HIGH);
+    frequency = pulseIn(OUT_PIN, LOW);
+    Serial.print("G= ");
+    greenValue = frequency;
+    Serial.print(frequency);
+    Serial.print(" ");
+    delay(100);
+
+    digitalWrite(S2,LOW);
+    digitalWrite(S3, HIGH);
+    frequency = pulseIn(OUT_PIN, LOW);
+    blueValue = frequency;
+    Serial.print("B= ");
+    Serial.print(frequency);
+    Serial.println(" ");
+
+    delay(100);
+
+    //check red
     if (random_color == 1){
-        if (redValue > blueValue && redValue > greenValue){
-            return true;
-        }
+        if (redValue < 70 && redValue > 40 &&
+            greenValue < 190 && greenValue > 150 &&
+            blueValue > 125 && blueValue < 250){
+                return true;
+            }
         return false;
+    //check green
     }else if(random_color == 2){
-        if (greenValue > redValue && greenValue > blueValue){
-            return true;
-        }
+        if (redValue < 150 && redValue > 110 &&
+            greenValue < 90 && greenValue > 50 &&
+            blueValue > 90 && blueValue < 150){
+                return true;
+            }
         return false;
+    //check blue
     }else if(random_color == 3){
-        if(blueValue > redValue && blueValue > greenValue){
-            return true;
-        }
+        if (redValue < 170 && redValue > 120 &&
+            greenValue < 140 && greenValue > 80 &&
+            blueValue > 30 && blueValue < 100){
+                return true;
+            }
         return false;
     }
-    
+    delay(100);
 }
 
 void GPSturnOn()
@@ -314,7 +320,8 @@ void GPSturnOn()
 
         // If GPS data is valid, print it
         if (gps.location.isUpdated())
-        {
+        {   
+            isGPSturnedOn = true;
             Serial.print("Latitude: ");
             Serial.println(gps.location.lat(), 6);
             Serial.print("Longitude: ");
@@ -420,64 +427,49 @@ int splitStringWithTokens(const String &text, String result[], int maxParts)
 
 uint8_t quest_type = 0;
 uint8_t quest_value = 0;
-
+bool isOnMovingQuest = false;
+bool iscompleteColorQuest = false;
 void loop()
-{
+{   
+    if (isOnColorQuest){
+        Seria
+        if (quest_type == 1){
+            iscompleteColorQuest =  colorChecking(1);
+        }else if(quest_type == 2){
+            iscompleteColorQuest = colorChecking(2);
+        }else if(quest_type == 3){
+            iscompleteColorQuest = colorChecking(3);
+        }
+
+        if(iscompleteColorQuest && isQuestCompleted && !isOnQuest){
+            isOnColorQuest = false;
+        }
+
+    }
+
+    if(isOnMovingQuest){
+        if (quest_type == 1){
+            
+        }else if(quest_type == 2){
+
+        }
+        if (isOnMovingQuest && isQuestCompleted && !isOnQuest){
+            isOnMovingQuest = false;
+        }
+    }
+    
     if (isOnQuest)
     {
         if (!isQuestCompleted)
         {
-            if (quest_type == 1)
-            {
-                // detect color quest
-                if (quest_value == 1)
-                {
-                    // red
-                    if(colorChecking(1)){
-                        isOnQuest = false;
-                        isQuestCompleted = true;
-                    }
-                    waitTimerForQuest();
-                }
-                else if (quest_value == 2)
-                {
-                    // green
-                    if(colorChecking(2)){
-                        isOnQuest = false;
-                        isQuestCompleted = true;
-                    }
-                    waitTimerForQuest();
-                }
-                else if (quest_value == 3)
-                {
-                    // blue
-                    if(colorChecking(3)){
-                        isOnQuest = false;
-                        isQuestCompleted = true;
-                    }
-                    waitTimerForQuest();
-                }
-                // this is when the story telling needs to stop and quest handling will kick in
+            if(isWaitingForQuestCompletion){
+                waitTimerForQuest();
             }
-            else if (quest_type == 2)
-            {
-                // detect movement quest
-                if (quest_value == 1)
-                {
-                    // 3m
-                    waitTimerForQuest();
-                }
-                else if (quest_value == 2)
-                {
-                    // 6m
-                    waitTimerForQuest();
-                }
-            }
+            
         }
         else
         {
             RequestBackendPremadeTTS(PREMADE_TTS_QUEST_DONE);
-            // exit On quest
             isOnQuest = false;
         }
     }
@@ -540,6 +532,7 @@ void loop()
                         if (parts[i] == "*")
                         {
                             quest_type = 1;
+                            isOnColorQuest == true;
                             // detect color quest
                             if (parts[i + 1] == "(1)")
                             {
@@ -560,6 +553,7 @@ void loop()
                         }
                         else if (parts[i] == "$")
                         {
+                            isOnMovingQuest == true;
                             quest_type = 2;
                             // detect movement quest
                             if (parts[i + 1] == "(1)")

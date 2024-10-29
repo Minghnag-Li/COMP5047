@@ -9,7 +9,7 @@
 #define SWITCH_PIN 35
 #define PUSH_PIN 34
 #define CS_LED_PIN 19
-#define S0 13 
+#define S0 13
 #define S1 14
 #define S2 0
 #define S3 26
