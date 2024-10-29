@@ -36,8 +36,11 @@ bool player_num_button_pressed = false;
 bool isWaitingPlayerNumStart = false;
 bool isStoryTelling = false;
 bool isOnQuest = false;
+bool isOnColorQuest= false;
+bool isGPSturnedOn = false;
 bool isWaitingForQuestCompletion = false;
 bool isQuestCompleted = false;
+bool hasStoryVoiceReturned = false;
 // color sensor vars
 volatile unsigned long redPulseCount = 0;
 volatile unsigned long greenPulseCount = 0;
@@ -122,13 +125,17 @@ void setup()
     pinMode(S3, OUTPUT);
     pinMode(OUT_PIN, INPUT);
     pinMode(PUSH_PIN, INPUT);
+    pinMode(CS_LED_PIN, OUTPUT);
+    //turn on CS LED
+    digitalWrite(CS_LED_PIN, HIGH);
+
     digitalWrite(PUSH_PIN, HIGH);
     digitalWrite(S0, HIGH);
     digitalWrite(S1, HIGH);
-    timer = timerBegin(0, 80, true);             // Timer 0, 分频80
-    timerAttachInterrupt(timer, &onTimer, true); // 绑定中断服务函数
-    timerAlarmWrite(timer, 1000000, true);       // 1秒触发一次
-    timerAlarmEnable(timer);                     // 启用定时器警报
+    timer = timerBegin(0, 80, true);             // Timer 0, prescaler 80
+    timerAttachInterrupt(timer, &onTimer, true); // Attach interrupt
+    timerAlarmWrite(timer, 1000000, true);       // Set alarm to trigger every 1 second
+    timerAlarmEnable(timer);   
 
     // Start the serial communication for debugging
     Serial.begin(115200);
@@ -159,24 +166,10 @@ void setup()
     // Configure switch pin
     pinMode(SWITCH_PIN, INPUT);
 
-    // bool result = RequestBackendTTS(textToTranserToTTS);
-
-    // Serial.println("RequestBackendTTS result: ");
-    // Serial.println(result);
-
     // Configure wakeup source
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(SWITCH_PIN), 1); // Wake up when switch is turned ON
-    // RequestBackendPremadeTTS(PREMADE_TTS_STORY_START);
 }
 
-bool checkColorQuest(const String &color)
-{
-    if (color == "red")
-    {
-        return true;
-    }
-    return false;
-}
 
 std::string generatePrompt(int player_num)
 {
@@ -245,29 +238,27 @@ void waitTimerForQuest()
     {
         quest_time_stamp = millis();
         isWaitingForQuestCompletion = true;
+        RequestBackendPremadeTTS(PREMADE_TTS_QUEST_WAITING);
     }
-    if (millis() - quest_time_stamp >= 10000)
+    if (millis() - quest_time_stamp >= 20000)
     {
+        Serial.println("Skipping Quest");
         isWaitingForQuestCompletion = false;
+        RequestBackendPremadeTTS(PREMADE_TTS_QUEST_SKIPPED);
+        isOnQuest = false;
+        isQuestCompleted = false;
     }
 }
-int getRandom123()
-{
-    // Seed the random number generator with the current time
-    static std::random_device rd;                         // Non-deterministic random number
-    static std::mt19937 gen(rd());                        // Mersenne Twister engine seeded with rd()
-    static std::uniform_int_distribution<int> dist(1, 3); // Range [1, 3]
-    delay(1000);
-    return dist(gen); // Generate a random number in the range 1 to 3
-}
+int redValue = 0;
+int greenValue = 0;
+int blueValue = 0;
 
-void colorChecking(int random_color)
+bool colorChecking(int random_color)
 {
-
-    Serial.print("Red: ");
+    Serial.print("  Red: ");
     if (redPulseCount > 0)
     {
-        Serial.print(1000000 / redPulseCount);
+        redValue = 1000000 / redPulseCount;
     }
     else
     {
@@ -276,7 +267,7 @@ void colorChecking(int random_color)
     Serial.print("  Green: ");
     if (greenPulseCount > 0)
     {
-        Serial.print(1000000 / greenPulseCount);
+        greenValue = 1000000 / greenPulseCount;
     }
     else
     {
@@ -285,14 +276,29 @@ void colorChecking(int random_color)
     Serial.print("  Blue: ");
     if (bluePulseCount > 0)
     {
-        Serial.print(1000000 / bluePulseCount);
-    }
-    else
+        blueValue=  1000000 / bluePulseCount;
+    }else
     {
         Serial.print("N/A");
     }
-    Serial.println();
-    delay(1000);
+
+    if (random_color == 1){
+        if (redValue > blueValue && redValue > greenValue){
+            return true;
+        }
+        return false;
+    }else if(random_color == 2){
+        if (greenValue > redValue && greenValue > blueValue){
+            return true;
+        }
+        return false;
+    }else if(random_color == 3){
+        if(blueValue > redValue && blueValue > greenValue){
+            return true;
+        }
+        return false;
+    }
+    
 }
 
 void GPSturnOn()
@@ -419,39 +425,60 @@ void loop()
 {
     if (isOnQuest)
     {
-        if (quest_type == 1)
+        if (!isQuestCompleted)
         {
-            // detect color quest
-            if (quest_value == 1)
+            if (quest_type == 1)
             {
-                // red
-                waitTimerForQuest();
+                // detect color quest
+                if (quest_value == 1)
+                {
+                    // red
+                    if(colorChecking(1)){
+                        isOnQuest = false;
+                        isQuestCompleted = true;
+                    }
+                    waitTimerForQuest();
+                }
+                else if (quest_value == 2)
+                {
+                    // green
+                    if(colorChecking(2)){
+                        isOnQuest = false;
+                        isQuestCompleted = true;
+                    }
+                    waitTimerForQuest();
+                }
+                else if (quest_value == 3)
+                {
+                    // blue
+                    if(colorChecking(3)){
+                        isOnQuest = false;
+                        isQuestCompleted = true;
+                    }
+                    waitTimerForQuest();
+                }
+                // this is when the story telling needs to stop and quest handling will kick in
             }
-            else if (quest_value == 2)
+            else if (quest_type == 2)
             {
-                // green
-                waitTimerForQuest();
+                // detect movement quest
+                if (quest_value == 1)
+                {
+                    // 3m
+                    waitTimerForQuest();
+                }
+                else if (quest_value == 2)
+                {
+                    // 6m
+                    waitTimerForQuest();
+                }
             }
-            else if (quest_value == 3)
-            {
-                // blue
-                waitTimerForQuest();
-            }
-            // this is when the story telling needs to stop and quest handling will kick in
         }
-        else if (quest_type == 2)
+        else
         {
-            // detect movement quest
-            if (quest_value == 1)
-            {
-                // 3m
-                waitTimerForQuest();
-            }
-            else if (quest_value == 2)
-            {
-                // 6m
-                waitTimerForQuest();
-            }
+            RequestBackendPremadeTTS(PREMADE_TTS_QUEST_DONE);
+            // exit On quest
+            isOnQuest = false;
         }
     }
     else
@@ -471,6 +498,7 @@ void loop()
         else if (!isWaitingForPlayerNum)
         {
             systemActive = true;
+            GPSturnOn();
             if (!hasMadeAIAPIrequest)
             {
                 Serial.println("-----------------Making request to AI");
@@ -487,8 +515,7 @@ void loop()
 
                 for (int i = 0; i < numParts; i++)
                 {
-                    Serial.print("--------------------- index of element sent");
-                    Serial.print(parts[i]);
+
                     if (parts[i] != "*" &&
                         parts[i] != "$" &&
                         parts[i] != "(1)" &&
@@ -498,11 +525,15 @@ void loop()
                         isOnQuest = false;
                         isStoryTelling = true;
                         // if not isOnQuest and isStoryTelling
-
-                        RequestBackendTTS(parts[i]);
+                    Serial.print("--------------------- index of element sent ");
+                    Serial.print(i);
+                    Serial.println(parts[i]);
+                    RequestBackendTTS(parts[i]);
+                    hasStoryVoiceReturned = true;
                     }
                     else
                     {
+                        hasStoryVoiceReturned = false;
                         isOnQuest = true;
                         isStoryTelling = false;
                         RequestBackendPremadeTTS(PREMADE_TTS_QUEST_WAITING);
@@ -544,6 +575,7 @@ void loop()
                         }
                     }
                 }
+                RequestBackendPremadeTTS(PREMADE_TTS_STORY_END);
                 hasMadeAIAPIrequest = true;
             }
             else
