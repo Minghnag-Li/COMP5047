@@ -91,6 +91,8 @@ def split_text(text):
             else:
                 tt3s.append(tt3)
                 tt3 = ""
+        if tt3 != "":
+            tt3s.append(tt3)
         return tt3s
 
     def split_text_by_comma(t1):
@@ -108,6 +110,8 @@ def split_text(text):
             else:
                 tt2s.append(tt2)
                 tt2 = ""
+        if tt2 != "":
+            tt2s.append(tt2)
         return tt2s
 
     tt1s = []
@@ -122,6 +126,8 @@ def split_text(text):
         else:
             tt1s.append(tt1 + t1)
             tt1 = ""
+    if tt1 != "":
+        tt1s.append(tt1)
 
     return tt1s
 

@@ -20,16 +20,16 @@ TinyGPSPlus gps;
 
 // Define hardware serial port for GPS
 HardwareSerial SerialGPS(2);
-//timestamps
+// timestamps
 int player_num_time_stamp = 0;
 int quest_time_stamp = 0;
-//push button vars
+// push button vars
 int buttonState = LOW;
 int newButtonState = LOW;
 int buttonPressedTimeStamp = 0;
 int debounceWindow = 40;
 int counted = 0;
-//bool var for device flow
+// bool var for device flow
 bool isWaitingForPlayerNum = true;
 bool systemActive = false;
 bool player_num_button_pressed = false;
@@ -38,48 +38,51 @@ bool isStoryTelling = false;
 bool isOnQuest = false;
 bool isWaitingForQuestCompletion = false;
 bool isQuestCompleted = false;
-//color sensor vars
+// color sensor vars
 volatile unsigned long redPulseCount = 0;
 volatile unsigned long greenPulseCount = 0;
 volatile unsigned long bluePulseCount = 0;
 
-//Wifi vars
-const char *ssid = "YUKARISAW";    // TODO: replace with wifi ssid
+// Wifi vars
+const char *ssid = "YUKARISAW"; // TODO: replace with wifi ssid
 const char *password = "88888889";
 WiFiClient *streamClient;
 HTTPClient http;
-//TTS vars
+// TTS vars
 String textToTranserToTTS;
 
-int player_num = 0; //TODO: player number var here
-//AI API vars
+int player_num = 0; // TODO: player number var here
+// AI API vars
 bool hasMadeAIAPIrequest = false;
 
-                                
 hw_timer_t *timer = NULL;
 
+void IRAM_ATTR onTimer()
+{
 
-void IRAM_ATTR onTimer() {
-
-  static int currentColor = 0; // 0: Red, 1: Green, 2: Blue
-  if (currentColor == 0) {
-    digitalWrite(S2, LOW);
-    digitalWrite(S3, LOW);
-    redPulseCount = pulseIn(OUT_PIN, LOW, 1000000);  
-    currentColor = 1;  // 切换到绿色
-  } else if (currentColor == 1) {
-    digitalWrite(S2, HIGH);
-    digitalWrite(S3, HIGH);
-    greenPulseCount = pulseIn(OUT_PIN, LOW, 1000000);  // 读取脉冲
-    currentColor = 2;  // 切换到蓝色
-  } else if (currentColor == 2) {
-    digitalWrite(S2, LOW);
-    digitalWrite(S3, HIGH);
-    bluePulseCount = pulseIn(OUT_PIN, LOW, 1000000);  // 读取脉冲
-    currentColor = 0;  // 切换回红色
-  }
+    static int currentColor = 0; // 0: Red, 1: Green, 2: Blue
+    if (currentColor == 0)
+    {
+        digitalWrite(S2, LOW);
+        digitalWrite(S3, LOW);
+        redPulseCount = pulseIn(OUT_PIN, LOW, 1000000);
+        currentColor = 1; // 切换到绿色
+    }
+    else if (currentColor == 1)
+    {
+        digitalWrite(S2, HIGH);
+        digitalWrite(S3, HIGH);
+        greenPulseCount = pulseIn(OUT_PIN, LOW, 1000000); // 读取脉冲
+        currentColor = 2;                                 // 切换到蓝色
+    }
+    else if (currentColor == 2)
+    {
+        digitalWrite(S2, LOW);
+        digitalWrite(S3, HIGH);
+        bluePulseCount = pulseIn(OUT_PIN, LOW, 1000000); // 读取脉冲
+        currentColor = 0;                                // 切换回红色
+    }
 }
-
 
 // Function to configure I2S for audio
 void setupI2S()
@@ -89,11 +92,11 @@ void setupI2S()
         .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_TX), // Master, Transmit mode
         .sample_rate = 24000,                              // 44.1kHz sample rate
         .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,      // 16-bit audio
-        .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,      // Stereo format
+        .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,       // Stereo format
         .communication_format = I2S_COMM_FORMAT_I2S_MSB,   // I2S communication format
-        .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,                             // Default interrupt allocation
+        .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,          // Default interrupt allocation
         .dma_buf_count = 8,                                // Number of DMA buffers
-        .dma_buf_len = 128,                                 // DMA buffer length
+        .dma_buf_len = 128,                                // DMA buffer length
         .use_apll = false,
         .tx_desc_auto_clear = true};
 
@@ -110,9 +113,8 @@ void setupI2S()
     i2s_set_clk(I2S_NUM_0, 24000, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO);
 }
 
-
-
-void setup() {
+void setup()
+{
     Serial.begin(115200);
     pinMode(S0, OUTPUT);
     pinMode(S1, OUTPUT);
@@ -123,10 +125,10 @@ void setup() {
     digitalWrite(PUSH_PIN, HIGH);
     digitalWrite(S0, HIGH);
     digitalWrite(S1, HIGH);
-    timer = timerBegin(0, 80, true);  // Timer 0, 分频80
-    timerAttachInterrupt(timer, &onTimer, true);  // 绑定中断服务函数
-    timerAlarmWrite(timer, 1000000, true);  // 1秒触发一次
-    timerAlarmEnable(timer);  // 启用定时器警报
+    timer = timerBegin(0, 80, true);             // Timer 0, 分频80
+    timerAttachInterrupt(timer, &onTimer, true); // 绑定中断服务函数
+    timerAlarmWrite(timer, 1000000, true);       // 1秒触发一次
+    timerAlarmEnable(timer);                     // 启用定时器警报
 
     // Start the serial communication for debugging
     Serial.begin(115200);
@@ -157,30 +159,32 @@ void setup() {
     // Configure switch pin
     pinMode(SWITCH_PIN, INPUT);
 
+    // bool result = RequestBackendTTS(textToTranserToTTS);
 
-    //bool result = RequestBackendTTS(textToTranserToTTS);
-    
-    //Serial.println("RequestBackendTTS result: ");
-    //Serial.println(result);
+    // Serial.println("RequestBackendTTS result: ");
+    // Serial.println(result);
 
     // Configure wakeup source
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(SWITCH_PIN), 1); // Wake up when switch is turned ON
-    //RequestBackendPremadeTTS(PREMADE_TTS_STORY_START);
+    // RequestBackendPremadeTTS(PREMADE_TTS_STORY_START);
 }
 
-
-bool checkColorQuest(const String& color){
-    if (color == "red"){
+bool checkColorQuest(const String &color)
+{
+    if (color == "red")
+    {
         return true;
     }
     return false;
 }
 
-std::string generatePrompt(int player_num) {
+std::string generatePrompt(int player_num)
+{
     std::ostringstream oss;
     oss << R"(Please generate a 1000 words story for kids from age 5 to 10, this text generated will strictly follow these requirements: 
 -Have a futuristic setting 
--Will have )" << player_num << R"( number of main characters interacting with each other
+-Will have )"
+        << player_num << R"( number of main characters interacting with each other
 -Will have at least 5 quests embedded into the story line, there are 2 types of quest I want you to add: 
     -Find an object with color {either Red, Green or Blue} or Move a distance of {3m or 6m}.
 -Important: There MUST have an asterisk token *(1, 2 or 3 regarding red, green or blue) after every color finding quest and $(1 or 2 regarding 3m or 6m) for moving a distance quest introduction line, DO NOT PUT any token (*, $) before the quest introduction line (like this example: 
@@ -191,85 +195,108 @@ Find an object with color Blue *(3)  ).
     return oss.str();
 }
 
-//read button clicks and set player number
-void setPlayerNum() {
-    //read button clicks and set player number
+// read button clicks and set player number
+void setPlayerNum()
+{
+    // read button clicks and set player number
     newButtonState = digitalRead(PUSH_PIN);
-    if (newButtonState != buttonState){
+    if (newButtonState != buttonState)
+    {
         buttonPressedTimeStamp = millis();
         counted = 0;
     }
-    if (millis() - buttonPressedTimeStamp >= debounceWindow){
-        if(newButtonState == HIGH && counted == 0){
+    if (millis() - buttonPressedTimeStamp >= debounceWindow)
+    {
+        if (newButtonState == HIGH && counted == 0)
+        {
             player_num_button_pressed = true;
-            if(player_num < 3){
-                player_num ++;
+            if (player_num < 3)
+            {
+                player_num++;
                 counted = 1;
-            }else{
-               player_num = 0;
-               counted = 1; 
             }
-            
+            else
+            {
+                player_num = 0;
+                counted = 1;
+            }
         }
     }
     buttonState = newButtonState;
 }
-//Timer methods 
-void waitTimerForPlayerNumInput(){
-    //A Timer for waiting for player number input from user (20s)
-    if (!isWaitingPlayerNumStart){
+// Timer methods
+void waitTimerForPlayerNumInput()
+{
+    // A Timer for waiting for player number input from user (20s)
+    if (!isWaitingPlayerNumStart)
+    {
         player_num_time_stamp = millis();
         isWaitingPlayerNumStart = true;
     }
-    if (millis() - player_num_time_stamp >= 20000){
+    if (millis() - player_num_time_stamp >= 20000)
+    {
         isWaitingForPlayerNum = false;
     }
 }
-void waitTimerForQuest(){
-    //A Timer for waiting for quest to be completed by user (60s)
-    if(!isWaitingForQuestCompletion){
+void waitTimerForQuest()
+{
+    // A Timer for waiting for quest to be completed by user (60s)
+    if (!isWaitingForQuestCompletion)
+    {
         quest_time_stamp = millis();
         isWaitingForQuestCompletion = true;
     }
-    if(millis() - quest_time_stamp >= 10000){
+    if (millis() - quest_time_stamp >= 10000)
+    {
         isWaitingForQuestCompletion = false;
     }
 }
-int getRandom123() {
+int getRandom123()
+{
     // Seed the random number generator with the current time
-    static std::random_device rd;  // Non-deterministic random number
-    static std::mt19937 gen(rd()); // Mersenne Twister engine seeded with rd()
+    static std::random_device rd;                         // Non-deterministic random number
+    static std::mt19937 gen(rd());                        // Mersenne Twister engine seeded with rd()
     static std::uniform_int_distribution<int> dist(1, 3); // Range [1, 3]
     delay(1000);
     return dist(gen); // Generate a random number in the range 1 to 3
-
 }
 
-void colorChecking(int random_color){
-    
+void colorChecking(int random_color)
+{
+
     Serial.print("Red: ");
-    if (redPulseCount > 0) {
+    if (redPulseCount > 0)
+    {
         Serial.print(1000000 / redPulseCount);
-    } else {
+    }
+    else
+    {
         Serial.println("N/A");
     }
     Serial.print("  Green: ");
-    if (greenPulseCount > 0) {
+    if (greenPulseCount > 0)
+    {
         Serial.print(1000000 / greenPulseCount);
-    } else {
+    }
+    else
+    {
         Serial.print("N/A");
     }
     Serial.print("  Blue: ");
-    if (bluePulseCount > 0) {
+    if (bluePulseCount > 0)
+    {
         Serial.print(1000000 / bluePulseCount);
-    } else {
+    }
+    else
+    {
         Serial.print("N/A");
     }
     Serial.println();
-    delay(1000);  
+    delay(1000);
 }
 
-void GPSturnOn(){
+void GPSturnOn()
+{
     // If the system is active, proceed with GPS reading and tone generation
     if (systemActive)
     {
@@ -294,27 +321,33 @@ void GPSturnOn(){
     }
 }
 
-void checkSystemTurnOn(){
-    //Check if system turning on or off base on the signal read from switch button
+void checkSystemTurnOn()
+{
+    // Check if system turning on or off base on the signal read from switch button
     bool currentSwitchState = digitalRead(SWITCH_PIN);
-    if (currentSwitchState == LOW) {
+    if (currentSwitchState == LOW)
+    {
         Serial.println("System is OFF, entering deep sleep");
-        delay(100);  // Small delay before sleep
-        esp_deep_sleep_start();  // Enter deep sleep
-    } else if (currentSwitchState == HIGH && !systemActive) {
+        delay(100);             // Small delay before sleep
+        esp_deep_sleep_start(); // Enter deep sleep
+    }
+    else if (currentSwitchState == HIGH && !systemActive)
+    {
         systemActive = true;
         Serial.println("System is ON");
     }
 }
 
-const int MAX_PARTS = 50; 
+const int MAX_PARTS = 50;
 
-int splitStringWithTokens(const String& text, String result[], int maxParts) {
+int splitStringWithTokens(const String &text, String result[], int maxParts)
+{
     int currentIndex = 0;
     int start = 0;
 
     // Loop until no more tokens are found, and ensure we don't exceed maxParts
-    while (currentIndex < maxParts - 1) {
+    while (currentIndex < maxParts - 1)
+    {
         int asteriskPos = text.indexOf('*', start);
         int dollarPos = text.indexOf('$', start);
 
@@ -322,127 +355,202 @@ int splitStringWithTokens(const String& text, String result[], int maxParts) {
         int nextTokenPos = -1;
         char token = '\0';
 
-        if (asteriskPos != -1 && (dollarPos == -1 || asteriskPos < dollarPos)) {
+        if (asteriskPos != -1 && (dollarPos == -1 || asteriskPos < dollarPos))
+        {
             nextTokenPos = asteriskPos;
             token = '*';
-        } else if (dollarPos != -1) {
+        }
+        else if (dollarPos != -1)
+        {
             nextTokenPos = dollarPos;
             token = '$';
         }
 
         // Break if no more tokens are found
-        if (nextTokenPos == -1) {
+        if (nextTokenPos == -1)
+        {
             break;
         }
 
         // Add the text before the token to the result array, if there's any
-        if (nextTokenPos > start && currentIndex < maxParts) {
+        if (nextTokenPos > start && currentIndex < maxParts)
+        {
             result[currentIndex++] = text.substring(start, nextTokenPos);
         }
 
         // Add the token itself as a separate element
-        if (currentIndex < maxParts) {
+        if (currentIndex < maxParts)
+        {
             result[currentIndex++] = String(token);
         }
 
         // Check if a number follows in the format (1), (2), or (3)
         if (nextTokenPos + 2 < text.length() && text[nextTokenPos + 1] == '(' &&
             (text[nextTokenPos + 2] == '1' || text[nextTokenPos + 2] == '2' || text[nextTokenPos + 2] == '3') &&
-            text[nextTokenPos + 3] == ')') {
+            text[nextTokenPos + 3] == ')')
+        {
 
             // Add the number part as a separate element
-            if (currentIndex < maxParts) {
+            if (currentIndex < maxParts)
+            {
                 result[currentIndex++] = text.substring(nextTokenPos + 1, nextTokenPos + 4); // e.g., "(1)"
             }
             start = nextTokenPos + 4; // Move past the token and the number
-        } else {
+        }
+        else
+        {
             start = nextTokenPos + 1; // Move past the token if no number follows
         }
     }
 
     // Add the last segment after the final token, if there's space
-    if (start < text.length() && currentIndex < maxParts) {
+    if (start < text.length() && currentIndex < maxParts)
+    {
         result[currentIndex++] = text.substring(start);
     }
 
     return currentIndex; // Returns the number of parts in the result array
 }
 
+uint8_t quest_type = 0;
+uint8_t quest_value = 0;
 
-void loop() {
-    //timer for 30s if timer done and player hasn't pressed the button, the program end.
-    waitTimerForPlayerNumInput();
-    //check if the player has pressed the input and set the player num if they have
-    setPlayerNum();
-    
-    if(!player_num_button_pressed && !isWaitingForPlayerNum){
-        if(player_num <= 0) {
-        Serial.println("System will be off because player didn't set player num");
-        esp_deep_sleep_start();
-        }
-    }else if (!isWaitingForPlayerNum){
-        systemActive = true;
-        if(!hasMadeAIAPIrequest){
-            Serial.println("-----------------Making request to AI");
-            //if haven't made a request to AI, make a request to get a story
-            //then send the story to tts module
-            textToTranserToTTS = callOpenAI(String(generatePrompt(player_num).c_str()));
-            Serial.println(textToTranserToTTS);
-            Serial.println("-----------------Transfer text to TTS");
-            String parts[MAX_PARTS];
-            //split the response string with * as delimeter and include * as a separate element
-            int numParts = splitStringWithTokens(textToTranserToTTS, parts, MAX_PARTS);
-            Serial.println("Split parts:");
-            RequestBackendPremadeTTS(PREMADE_TTS_STORY_START);
-        
-            for (int i = 0; i < numParts; i++) {
-                Serial.print("--------------------- index of element sent");
-                Serial.print(parts[i]);
-                if (parts[i] != "*" && 
-                    parts[i] != "$" &&
-                    parts[i] != "(1)" &&
-                    parts[i] != "(2)" &&
-                    parts[i] != "(3)"){
-                    isOnQuest = false;
-                    isStoryTelling = true;
-                    //if not isOnQuest and isStoryTelling
-                    
-                    RequestBackendTTS(parts[i]);
-                }else{
-                    isOnQuest = true;
-                    isStoryTelling = false;
-                    RequestBackendPremadeTTS(PREMADE_TTS_QUEST_WAITING);
-                    if (parts[i] == "*"){
-                        //detect color quest
-                        if (parts[i+1] == "(1)"){
-                            //red
-                            waitTimerForQuest();
-                        }else if(parts[i+1] == "(2)"){
-                            //green
-                            waitTimerForQuest();
-                        }else if(parts[i+1] == "(3)"){
-                            //blue
-                            waitTimerForQuest();
-                        }
-                        //this is when the story telling needs to stop and quest handling will kick in
-                        
-                    }else if (parts[i] == "$") {
-                        //detect movement quest
-                        if (parts[i+1] == "(1)"){
-                            //3m
-                            waitTimerForQuest();
-                        }else if(parts[i+1] == "(2)"){
-                            //6m
-                            waitTimerForQuest();
-                        }
-                    }
-                }  
+void loop()
+{
+    if (isOnQuest)
+    {
+        if (quest_type == 1)
+        {
+            // detect color quest
+            if (quest_value == 1)
+            {
+                // red
+                waitTimerForQuest();
             }
-            hasMadeAIAPIrequest = true;
-        }else{
-           
+            else if (quest_value == 2)
+            {
+                // green
+                waitTimerForQuest();
+            }
+            else if (quest_value == 3)
+            {
+                // blue
+                waitTimerForQuest();
+            }
+            // this is when the story telling needs to stop and quest handling will kick in
+        }
+        else if (quest_type == 2)
+        {
+            // detect movement quest
+            if (quest_value == 1)
+            {
+                // 3m
+                waitTimerForQuest();
+            }
+            else if (quest_value == 2)
+            {
+                // 6m
+                waitTimerForQuest();
+            }
         }
     }
+    else
+    {
+        // timer for 30s if timer done and player hasn't pressed the button, the program end.
+        waitTimerForPlayerNumInput();
+        // check if the player has pressed the input and set the player num if they have
+        setPlayerNum();
+        if (!player_num_button_pressed && !isWaitingForPlayerNum)
+        {
+            if (player_num <= 0)
+            {
+                Serial.println("System will be off because player didn't set player num");
+                esp_deep_sleep_start();
+            }
+        }
+        else if (!isWaitingForPlayerNum)
+        {
+            systemActive = true;
+            if (!hasMadeAIAPIrequest)
+            {
+                Serial.println("-----------------Making request to AI");
+                // if haven't made a request to AI, make a request to get a story
+                // then send the story to tts module
+                textToTranserToTTS = callOpenAI(String(generatePrompt(player_num).c_str()));
+                Serial.println(textToTranserToTTS);
+                Serial.println("-----------------Transfer text to TTS");
+                String parts[MAX_PARTS];
+                // split the response string with * as delimeter and include * as a separate element
+                int numParts = splitStringWithTokens(textToTranserToTTS, parts, MAX_PARTS);
+                Serial.println("Split parts:");
+                RequestBackendPremadeTTS(PREMADE_TTS_STORY_START);
+
+                for (int i = 0; i < numParts; i++)
+                {
+                    Serial.print("--------------------- index of element sent");
+                    Serial.print(parts[i]);
+                    if (parts[i] != "*" &&
+                        parts[i] != "$" &&
+                        parts[i] != "(1)" &&
+                        parts[i] != "(2)" &&
+                        parts[i] != "(3)")
+                    {
+                        isOnQuest = false;
+                        isStoryTelling = true;
+                        // if not isOnQuest and isStoryTelling
+
+                        RequestBackendTTS(parts[i]);
+                    }
+                    else
+                    {
+                        isOnQuest = true;
+                        isStoryTelling = false;
+                        RequestBackendPremadeTTS(PREMADE_TTS_QUEST_WAITING);
+                        if (parts[i] == "*")
+                        {
+                            quest_type = 1;
+                            // detect color quest
+                            if (parts[i + 1] == "(1)")
+                            {
+                                quest_value = 1;
+                                // red
+                            }
+                            else if (parts[i + 1] == "(2)")
+                            {
+                                quest_value = 2;
+                                // green
+                            }
+                            else if (parts[i + 1] == "(3)")
+                            {
+                                quest_value = 3;
+                                // blue
+                            }
+                            // this is when the story telling needs to stop and quest handling will kick in
+                        }
+                        else if (parts[i] == "$")
+                        {
+                            quest_type = 2;
+                            // detect movement quest
+                            if (parts[i + 1] == "(1)")
+                            {
+                                quest_value = 1;
+                                // 3m
+                            }
+                            else if (parts[i + 1] == "(2)")
+                            {
+                                quest_value = 2;
+                                // 6m
+                            }
+                        }
+                    }
+                }
+                hasMadeAIAPIrequest = true;
+            }
+            else
+            {
+            }
+        }
+    }
+
     delay(100);
 }
-
