@@ -19,6 +19,8 @@ INTERNAL_SERVER_ERROR = 500
 
 GOOGLE_TTS_CONNECTION_POOL_MAX = 10
 
+file_lock = threading.Lock()
+
 
 def get_result(error_code=SUCCESS, data=None, error_msg=None):
     return {'error_code': error_code, 'data': data, 'error_msg': error_msg}
@@ -54,9 +56,13 @@ def request_once(text, file_index):
         request={"input": input_text, "voice": voice, "audio_config": audio_config}
     )
 
-    with open(f"output_{file_index}.wav", "wb") as out:
-        out.write(response.audio_content)
-        TLogger.tlog(f"Audio content written to file output_{file_index}.wav")
+    with file_lock:
+        with open(f"output_{file_index}.wav", "wb") as out:
+            out.write(response.audio_content)
+            TLogger.tlog(f"Audio content written to file output_{file_index}.wav")
+
+    with open(f"output_{file_index}.wav", "rb") as f:
+        TLogger.tlog(f"file output_{file_index}.wav with duration {get_wav_duration(f)}")
 
 
 def request_premade(text, filename):
@@ -66,9 +72,13 @@ def request_premade(text, filename):
         request={"input": input_text, "voice": voice, "audio_config": audio_config}
     )
 
-    with open(f"{filename}.wav", "wb") as out:
-        out.write(response.audio_content)
-        TLogger.tlog(f"Premade audio content written to file {filename}.wav")
+    with file_lock:
+        with open(f"{filename}.wav", "wb") as out:
+            out.write(response.audio_content)
+            TLogger.tlog(f"Premade audio content written to file {filename}.wav")
+
+    with open(f"{filename}.wav", "rb") as f:
+        TLogger.tlog(f"file {filename}.wav with duration {get_wav_duration(f)}")
 
 
 def split_text(text):
@@ -140,6 +150,14 @@ def url_decode(encoded_str):
     return urllib.parse.unquote(encoded_str)
 
 
+def get_wav_duration(filename):
+    with wave.open(filename, 'r') as wav:
+        frames = wav.getnframes()
+        rate = wav.getframerate()
+        duration = frames / float(rate)
+        return duration
+
+
 def tts(request):
     try:
         text = request.GET.get('text')
@@ -176,10 +194,11 @@ def tts(request):
             data.append([w.getparams(), w.readframes(w.getnframes())])
             w.close()
 
-        output = wave.open("output.wav", 'wb')
-        output.setparams(data[0][0])
-        for i in range(len(data)):
-            output.writeframes(data[i][1])
+        with file_lock:
+            output = wave.open("output.wav", 'wb')
+            output.setparams(data[0][0])
+            for i in range(len(data)):
+                output.writeframes(data[i][1])
 
         TLogger.tlog(f"Combined audio content written to file output.wav")
 
@@ -191,8 +210,9 @@ def tts(request):
 
 def get_tts_result(request):
     try:
-        TLogger.tlog(f"Return wav file")
-        return FileResponse(open("output.wav", "rb"), as_attachment=True)
+        file = open("output.wav", "rb")
+        TLogger.tlog(f"Return wav file with duration: {get_wav_duration(file):.2f}")
+        return FileResponse(file, as_attachment=True)
     except Exception as e:
         TLogger.terror(e)
         return get_json_response_result(FALSE)
