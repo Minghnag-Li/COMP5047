@@ -403,16 +403,19 @@ bool RequestBackendTTS(String &text)
         {
             stream = http_tts_result.getStreamPtr();
             // result = true;
-            while (stream->connected() && (bytesRead = stream->readBytes(buffer, sizeof(buffer))) > 0)
+            while (stream->connected() && stream->available() >= sizeof(buffer) && (bytesRead = stream->readBytes(buffer, sizeof(buffer))) > 0)
             {
+                Serial.println("--------------Telling story now");
                 size_t bytes_written;
                 i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
             }
+            Serial.println("------------------Finish this story text");
         }
         else
         {
             Serial.printf("Failed to connect, HTTP code: %d\n", httpCode);
         }
+
 
         http_tts_result.end();
 
@@ -451,20 +454,20 @@ bool RequestBackendPremadeTTS_(String &url)
 
     int httpCode = http_tts_result.GET();
 
-    if (httpCode == HTTP_CODE_OK)
-    {
-        stream = http_tts_result.getStreamPtr();
-        while (stream->connected() && (bytesRead = stream->readBytes(buffer, sizeof(buffer))) > 0)
+   if (httpCode == HTTP_CODE_OK)
         {
-            size_t bytes_written;
-            i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
+            stream = http_tts_result.getStreamPtr();
+            // result = true;
+            while (stream->connected() && stream->available() >= sizeof(buffer) && (bytesRead = stream->readBytes(buffer, sizeof(buffer))) > 0)
+            {
+                size_t bytes_written;
+                i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
+            }
         }
-        result = true;
-    }
-    else
-    {
-        Serial.printf("RequestBackendPremadeTTS_ failed, HTTP code: %d\n", httpCode);
-    }
+        else
+        {
+            Serial.printf("Failed to connect premade TTS, HTTP code: %d\n", httpCode);
+        }
 
     http_tts_result.end();
     return result;
@@ -477,16 +480,22 @@ bool RequestBackendPremadeTTS(uint8_t premade_tts_code)
     {
     case PREMADE_TTS_STORY_START:
         url += "story_start";
+        break;
     case PREMADE_TTS_QUEST_WAITING:
         url += "quest_waiting";
+        break;
     case PREMADE_TTS_QUEST_DONE:
         url += "quest_done";
+        break;
     case PREMADE_TTS_STORY_END:
         url += "story_end";
+        break;
     case PREMADE_TTS_QUEST_SKIPPED:
         url += "quest_skipped";
+        break;
     default:
         url += "undefined";
+        break;
     }
     return RequestBackendPremadeTTS_(url);
 }
