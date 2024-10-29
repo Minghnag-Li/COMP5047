@@ -252,7 +252,7 @@ int blueValue = 0;
 
 bool colorChecking(int random_color)
 {
-
+    //red
     digitalWrite(S2, LOW);
     digitalWrite(S3, LOW);
     frequency = pulseIn(OUT_PIN, LOW);
@@ -262,7 +262,7 @@ bool colorChecking(int random_color)
     // Serial.print(" ");
 
     // delay(100);
-
+    //green
     digitalWrite(S2, HIGH);
     digitalWrite(S3, HIGH);
     frequency = pulseIn(OUT_PIN, LOW);
@@ -271,7 +271,7 @@ bool colorChecking(int random_color)
     // Serial.print(frequency);
     // Serial.print(" ");
     // delay(100);
-
+    //blue
     digitalWrite(S2, LOW);
     digitalWrite(S3, HIGH);
     frequency = pulseIn(OUT_PIN, LOW);
@@ -322,28 +322,27 @@ bool colorChecking(int random_color)
 void GPSturnOn()
 {
     // If the system is active, proceed with GPS reading and tone generation
-    if (systemActive)
-    {
+   
         // Read data from GPS module
-        while (SerialGPS.available() > 0)
-        {
-            gps.encode(SerialGPS.read());
-        }
-
-        // If GPS data is valid, print it
-        if (gps.location.isUpdated())
-        {
-            isGPSturnedOn = true;
-            Serial.print("Latitude: ");
-            Serial.println(gps.location.lat(), 6);
-            Serial.print("Longitude: ");
-            Serial.println(gps.location.lng(), 6);
-            Serial.print("Altitude: ");
-            Serial.println(gps.altitude.meters());
-            Serial.print("Satellites: ");
-            Serial.println(gps.satellites.value());
-        }
+    while (SerialGPS.available() > 0)
+    {
+        gps.encode(SerialGPS.read());
     }
+
+    // If GPS data is valid, print it
+    if (gps.location.isUpdated())
+    {
+        isGPSturnedOn = true;
+        Serial.print("Latitude: ");
+        Serial.println(gps.location.lat(), 6);
+        Serial.print("Longitude: ");
+        Serial.println(gps.location.lng(), 6);
+        Serial.print("Altitude: ");
+        Serial.println(gps.altitude.meters());
+        Serial.print("Satellites: ");
+        Serial.println(gps.satellites.value());
+    }
+    
 }
 
 void checkSystemTurnOn()
@@ -439,188 +438,194 @@ uint8_t quest_value = 0;
 bool isOnMovingQuest = false;
 bool iscompleteColorQuest = false;
 void loop()
-{
-    bool currentSwitchState = digitalRead(SWITCH_PIN);
-    if (currentSwitchState == LOW)
-    {
-        Serial.println("System is OFF, entering deep sleep");
-        delay(100);             // Small delay before sleep
-        esp_deep_sleep_start(); // Enter deep sleep
-    }
-    else if (currentSwitchState == HIGH && !systemActive)
-    {
-        systemActive = true;
-        Serial.println("System is ON");
-   
-        if (isOnQuest)
+{   
+    GPSturnOn();
+    if(GPSturnOn){
+        bool currentSwitchState = digitalRead(SWITCH_PIN);
+        if (currentSwitchState == LOW)
         {
-            waitTimerForQuest();
-            if (isOnColorQuest)
+            Serial.println("System is OFF, entering deep sleep");
+            delay(100);             // Small delay before sleep
+            esp_deep_sleep_start(); // Enter deep sleep
+        }
+        else if (currentSwitchState == HIGH && !systemActive)
+        {
+            systemActive = true;
+            Serial.println("System is ON");
+    
+            if (isOnQuest)
             {
-                if (quest_value == 1)
+                waitTimerForQuest();
+                if (isOnColorQuest)
                 {
-                    iscompleteColorQuest = colorChecking(1);
-                }
-                else if (quest_value == 2)
-                {
-                    iscompleteColorQuest = colorChecking(2);
-                }
-                else if (quest_value == 3)
-                {
-                    iscompleteColorQuest = colorChecking(3);
+                    if (quest_value == 1)
+                    {
+                        iscompleteColorQuest = colorChecking(1);
+                    }
+                    else if (quest_value == 2)
+                    {
+                        iscompleteColorQuest = colorChecking(2);
+                    }
+                    else if (quest_value == 3)
+                    {
+                        iscompleteColorQuest = colorChecking(3);
+                    }
+
+                    if (iscompleteColorQuest)
+                    {
+                        isOnColorQuest = false;
+                        Serial.print("Color check is done: ");
+                        Serial.println(quest_value);
+                        RequestBackendPremadeTTS(PREMADE_TTS_QUEST_DONE);
+                    }
                 }
 
-                if (iscompleteColorQuest)
-                {
-                    isOnColorQuest = false;
-                    Serial.print("Color check is done: ");
-                    Serial.println(quest_value);
-                    RequestBackendPremadeTTS(PREMADE_TTS_QUEST_DONE);
-                }
-            }
-
-            if (isOnMovingQuest)
-            {
-                //checking logic for moving quest done here
-
-                
                 if (isOnMovingQuest)
                 {
-                    isOnMovingQuest = false;
-                    RequestBackendPremadeTTS(PREMADE_TTS_QUEST_DONE);
-                }
-            }
+                    //checking logic for moving quest done here
+                    if(quest_value == 1){
+                        //3m
+                    }else if(quest_value == 2){
+                        //6m
+                    }
 
-            if (!isOnColorQuest && !isOnMovingQuest)
-            {
-                isOnQuest = false;
-            }
-        }
-        else if (isStoryTelling)
-        {
-            if (part_pointer < numParts)
-            {
-                if (parts[part_pointer] != "*" &&
-                    parts[part_pointer] != "$" &&
-                    parts[part_pointer] != "(1)" &&
-                    parts[part_pointer] != "(2)" &&
-                    parts[part_pointer] != "(3)")
+                    if (isOnMovingQuest)
+                    {
+                        isOnMovingQuest = false;
+                        RequestBackendPremadeTTS(PREMADE_TTS_QUEST_DONE);
+                    }
+                }
+
+                if (!isOnColorQuest && !isOnMovingQuest)
                 {
                     isOnQuest = false;
-                    isStoryTelling = true;
-                    // if not isOnQuest and isStoryTelling
-                    Serial.print("--------------------- index of element sent ");
-                    Serial.print(part_pointer);
-                    Serial.println(parts[part_pointer]);
-                    RequestBackendTTS(parts[part_pointer]);
-                    hasStoryVoiceReturned = true;
                 }
-                else if (part_pointer + 1 < numParts)
+            }
+            else if (isStoryTelling)
+            {
+                if (part_pointer < numParts)
                 {
-                    Serial.println("Quest detected");
-                    Serial.print(parts[part_pointer]);
-                    Serial.print(parts[part_pointer + 1]);
-                    hasStoryVoiceReturned = false;
-                    isOnQuest = true;
-                    RequestBackendPremadeTTS(PREMADE_TTS_QUEST_WAITING);
-                    quest_time_stamp = millis();
-                    if (parts[part_pointer] == "*")
+                    if (parts[part_pointer] != "*" &&
+                        parts[part_pointer] != "$" &&
+                        parts[part_pointer] != "(1)" &&
+                        parts[part_pointer] != "(2)" &&
+                        parts[part_pointer] != "(3)")
                     {
-                        isOnColorQuest = true;
-                        // detect color quest
-                        if (parts[part_pointer + 1] == "(1)")
-                        {
-                            quest_value = 1;
-                            // red
-                            Serial.println("Quest: Find red object");
-                        }
-                        else if (parts[part_pointer + 1] == "(2)")
-                        {
-                            quest_value = 2;
-                            // green
-                            Serial.println("Quest: Find green object");
-                        }
-                        else if (parts[part_pointer + 1] == "(3)")
-                        {
-                            quest_value = 3;
-                            // blue
-                            Serial.println("Quest: Find blue object");
-                        }
-                        // this is when the story telling needs to stop and quest handling will kick in
+                        isOnQuest = false;
+                        isStoryTelling = true;
+                        // if not isOnQuest and isStoryTelling
+                        Serial.print("--------------------- index of element sent: ");
+                        Serial.print(part_pointer);
+                        Serial.println(parts[part_pointer]);
+                        RequestBackendTTS(parts[part_pointer]);
+                        hasStoryVoiceReturned = true;
                     }
-                    else if (parts[part_pointer] == "$")
+                    else if (part_pointer + 1 < numParts)
                     {
-                        isOnMovingQuest = true;
-                        // detect movement quest
-                        if (parts[part_pointer + 1] == "(1)")
+                        Serial.println("Quest detected");
+                        Serial.print(parts[part_pointer]);
+                        Serial.print(parts[part_pointer + 1]);
+                        hasStoryVoiceReturned = false;
+                        isOnQuest = true;
+                        RequestBackendPremadeTTS(PREMADE_TTS_QUEST_WAITING);
+                        quest_time_stamp = millis();
+                        if (parts[part_pointer] == "*")
                         {
-                            quest_value = 1;
-                            // 3m
-                            Serial.println("Quest: Move 3m");
+                            isOnColorQuest = true;
+                            // detect color quest
+                            if (parts[part_pointer + 1] == "(1)")
+                            {
+                                quest_value = 1;
+                                // red
+                                Serial.println("Quest: Find red object");
+                            }
+                            else if (parts[part_pointer + 1] == "(2)")
+                            {
+                                quest_value = 2;
+                                // green
+                                Serial.println("Quest: Find green object");
+                            }
+                            else if (parts[part_pointer + 1] == "(3)")
+                            {
+                                quest_value = 3;
+                                // blue
+                                Serial.println("Quest: Find blue object");
+                            }
+                            // this is when the story telling needs to stop and quest handling will kick in
                         }
-                        else if (parts[part_pointer + 1] == "(2)")
+                        else if (parts[part_pointer] == "$")
                         {
-                            quest_value = 2;
-                            // 6m
-                            Serial.println("Quest: Move 6m");
+                            isOnMovingQuest = true;
+                            // detect movement quest
+                            if (parts[part_pointer + 1] == "(1)")
+                            {
+                                quest_value = 1;
+                                // 3m
+                                Serial.println("Quest: Move 3m");
+                            }
+                            else if (parts[part_pointer + 1] == "(2)")
+                            {
+                                quest_value = 2;
+                                // 6m
+                                Serial.println("Quest: Move 6m");
+                            }
                         }
+                        else
+                        {
+                            Serial.println("None quest type!");
+                        }
+                        part_pointer++;
                     }
                     else
                     {
-                        Serial.println("None quest type!");
+                        Serial.println("Error: Invalid Quest due to the end of parts.");
                     }
                     part_pointer++;
                 }
                 else
                 {
-                    Serial.println("Error: Invalid Quest due to the end of parts.");
+                    RequestBackendPremadeTTS(PREMADE_TTS_STORY_END);
+                    isStoryTelling = false;
                 }
-                part_pointer++;
             }
             else
             {
-                RequestBackendPremadeTTS(PREMADE_TTS_STORY_END);
-                isStoryTelling = false;
-            }
-        }
-        else
-        {
-            // timer for 30s if timer done and player hasn't pressed the button, the program end.
-            waitTimerForPlayerNumInput();
-            // check if the player has pressed the input and set the player num if they have
-            setPlayerNum();
-            if (!player_num_button_pressed && !isWaitingForPlayerNum)
-            {
-                if (player_num <= 0)
+                // timer for 30s if timer done and player hasn't pressed the button, the program end.
+                waitTimerForPlayerNumInput();
+                // check if the player has pressed the input and set the player num if they have
+                setPlayerNum();
+                if (!player_num_button_pressed && !isWaitingForPlayerNum)
                 {
-                    Serial.println("System will be off because player didn't set player num");
-                    esp_deep_sleep_start();
+                    if (player_num <= 0)
+                    {
+                        Serial.println("System will be off because player didn't set player num");
+                        esp_deep_sleep_start();
+                    }
+                }
+                else if (!isWaitingForPlayerNum)
+                {
+                    systemActive = true;
+                    if (!hasMadeAIAPIrequest)
+                    {
+                        Serial.println("-----------------Making request to AI");
+                        // if haven't made a request to AI, make a request to get a story
+                        // then send the story to tts module
+                        textToTranserToTTS = callOpenAI(String(generatePrompt(player_num).c_str()));
+                        Serial.println(textToTranserToTTS);
+                        Serial.println("-----------------Transfer text to TTS");
+                        Serial.println("Split parts:");
+                        // split the response string with * as delimeter and include * as a separate element
+                        numParts = splitStringWithTokens(textToTranserToTTS, parts, MAX_PARTS);
+                        // start traverse
+                        part_pointer = 0;
+                        RequestBackendPremadeTTS(PREMADE_TTS_STORY_START);
+                        isStoryTelling = true;
+                        hasMadeAIAPIrequest = true;
+                    }
                 }
             }
-            else if (!isWaitingForPlayerNum)
-            {
-                systemActive = true;
-                GPSturnOn();
-                if (!hasMadeAIAPIrequest)
-                {
-                    Serial.println("-----------------Making request to AI");
-                    // if haven't made a request to AI, make a request to get a story
-                    // then send the story to tts module
-                    textToTranserToTTS = callOpenAI(String(generatePrompt(player_num).c_str()));
-                    Serial.println(textToTranserToTTS);
-                    Serial.println("-----------------Transfer text to TTS");
-                    Serial.println("Split parts:");
-                    // split the response string with * as delimeter and include * as a separate element
-                    numParts = splitStringWithTokens(textToTranserToTTS, parts, MAX_PARTS);
-                    // start traverse
-                    part_pointer = 0;
-                    RequestBackendPremadeTTS(PREMADE_TTS_STORY_START);
-                    isStoryTelling = true;
-                    hasMadeAIAPIrequest = true;
-                }
-            }
-        }
 
-        delay(100);
+            delay(100);
+        }
     }
 }
