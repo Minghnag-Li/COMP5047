@@ -234,7 +234,7 @@ void waitTimerForQuest()
         isWaitingForQuestCompletion = true;
         RequestBackendPremadeTTS(PREMADE_TTS_QUEST_WAITING);
     }
-    if (millis() - quest_time_stamp >= 20000)
+    if (millis() - quest_time_stamp >= 30000)
     {
         Serial.println("Skipping Quest");
         isWaitingForQuestCompletion = false;
@@ -427,65 +427,49 @@ int splitStringWithTokens(const String &text, String result[], int maxParts)
 
 uint8_t quest_type = 0;
 uint8_t quest_value = 0;
-
+bool isOnMovingQuest = false;
+bool iscompleteColorQuest = false;
 void loop()
-{
+{   
+    if (isOnColorQuest){
+        Seria
+        if (quest_type == 1){
+            iscompleteColorQuest =  colorChecking(1);
+        }else if(quest_type == 2){
+            iscompleteColorQuest = colorChecking(2);
+        }else if(quest_type == 3){
+            iscompleteColorQuest = colorChecking(3);
+        }
+
+        if(iscompleteColorQuest && isQuestCompleted && !isOnQuest){
+            isOnColorQuest = false;
+        }
+
+    }
+
+    if(isOnMovingQuest){
+        if (quest_type == 1){
+            
+        }else if(quest_type == 2){
+
+        }
+        if (isOnMovingQuest && isQuestCompleted && !isOnQuest){
+            isOnMovingQuest = false;
+        }
+    }
     
     if (isOnQuest)
     {
         if (!isQuestCompleted)
         {
-            if (quest_type == 1)
-            {
-                // detect color quest
-                if (quest_value == 1)
-                {
-                    // red
-                    if(colorChecking(1)){
-                        isOnQuest = false;
-                        isQuestCompleted = true;
-                    }
-                    waitTimerForQuest();
-                }
-                else if (quest_value == 2)
-                {
-                    // green
-                    if(colorChecking(2)){
-                        isOnQuest = false;
-                        isQuestCompleted = true;
-                    }
-                    waitTimerForQuest();
-                }
-                else if (quest_value == 3)
-                {
-                    // blue
-                    if(colorChecking(3)){
-                        isOnQuest = false;
-                        isQuestCompleted = true;
-                    }
-                    waitTimerForQuest();
-                }
-                // this is when the story telling needs to stop and quest handling will kick in
+            if(isWaitingForQuestCompletion){
+                waitTimerForQuest();
             }
-            else if (quest_type == 2)
-            {
-                // detect movement quest
-                if (quest_value == 1)
-                {
-                    // 3m
-                    waitTimerForQuest();
-                }
-                else if (quest_value == 2)
-                {
-                    // 6m
-                    waitTimerForQuest();
-                }
-            }
+            
         }
         else
         {
             RequestBackendPremadeTTS(PREMADE_TTS_QUEST_DONE);
-            // exit On quest
             isOnQuest = false;
         }
     }
@@ -548,6 +532,7 @@ void loop()
                         if (parts[i] == "*")
                         {
                             quest_type = 1;
+                            isOnColorQuest == true;
                             // detect color quest
                             if (parts[i + 1] == "(1)")
                             {
@@ -568,6 +553,7 @@ void loop()
                         }
                         else if (parts[i] == "$")
                         {
+                            isOnMovingQuest == true;
                             quest_type = 2;
                             // detect movement quest
                             if (parts[i + 1] == "(1)")
