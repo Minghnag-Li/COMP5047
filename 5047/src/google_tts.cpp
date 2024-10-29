@@ -18,7 +18,8 @@
 WiFiClient *stream;
 size_t bytesRead;
 uint8_t buffer[512];
-SemaphoreHandle_t ttsMutex = xSemaphoreCreateMutex();
+unsigned long last_data_check = 0;
+const unsigned long time_tolerance_wait_available = 100;
 
 // HTTPClient http_tts_result;
 
@@ -376,135 +377,154 @@ String urlEncode(String str)
 
 bool RequestBackendTTS(String &text)
 {
-    if (xSemaphoreTake(ttsMutex, portMAX_DELAY) == pdTRUE) // Wait indefinitely to acquire the mutex
+    bool result = false;
+
+    HTTPClient http;
+    http.setConnectTimeout(60000);
+    http.setTimeout(60000);
+    http.begin("http://192.168.137.1:8000/tts");
+    http.addHeader("text", urlEncode(text));
+    int httpCode = http.GET();
+
+    if (httpCode == HTTP_CODE_OK)
     {
-        bool result = false;
-
-        HTTPClient http;
-        http.setConnectTimeout(60000);
-        http.setTimeout(60000);
-        http.begin("http://192.168.137.1:8000/tts");
-        http.addHeader("text", urlEncode(text));
-        int httpCode = http.GET();
-
-        if (httpCode == HTTP_CODE_OK)
-        {
-            HTTPClient http_tts_result;
-            http_tts_result.setConnectTimeout(60000);
-            http_tts_result.setTimeout(60000);
-            http_tts_result.begin("http://192.168.137.1:8000/tts/result");
-
-            int httpCode = http_tts_result.GET();
-
-            if (httpCode == HTTP_CODE_OK)
-            {
-                stream = http_tts_result.getStreamPtr();
-                while (stream->connected())
-                {
-
-                    int remaining_data = stream->available();
-                    if (remaining_data > sizeof(buffer))
-                    {
-                        bytesRead = stream->readBytes(buffer, sizeof(buffer));
-                    }
-                    else if (remaining_data > 0)
-                    {
-                        bytesRead = stream->readBytes(buffer, remaining_data);
-                    }
-
-                    if (remaining_data <= 0) break;
-
-                    for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
-                    {
-                        int16_t *sample = ((int16_t *)buffer) + i;
-                        *sample = (int16_t)(*sample * 0.02);
-                    }
-
-                    size_t bytes_written;
-                    i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
-                }
-
-                Serial.println("------------------Finish this story text");
-            }
-            else
-            {
-                Serial.printf("Failed to connect, HTTP code: %d\n", httpCode);
-            }
-            http_tts_result.end();
-        }
-        else
-        {
-            Serial.printf("Request tts api failed: %d\n", httpCode);
-        }
-        http.end();
-
-        // Release the mutex to allow the next request
-        xSemaphoreGive(ttsMutex);
-        return result;
-    }
-    else
-    {
-        Serial.println("Failed to acquire TTS mutex");
-        return false;
-    }
-}
-
-bool RequestBackendPremadeTTS_(String &url)
-{
-    if (xSemaphoreTake(ttsMutex, portMAX_DELAY) == pdTRUE) // Wait indefinitely to acquire the mutex
-    {
-        bool result = false;
-
         HTTPClient http_tts_result;
         http_tts_result.setConnectTimeout(60000);
         http_tts_result.setTimeout(60000);
-        http_tts_result.begin(url);
+        http_tts_result.begin("http://192.168.137.1:8000/tts/result");
 
         int httpCode = http_tts_result.GET();
 
         if (httpCode == HTTP_CODE_OK)
         {
             stream = http_tts_result.getStreamPtr();
-            while (stream->connected())
+            while (true)
             {
-                int remaining_data = stream->available();
-                if (remaining_data > sizeof(buffer))
+                if (!stream->connected())
                 {
-                    bytesRead = stream->readBytes(buffer, sizeof(buffer));
+                    Serial.println("| ERROR | Disconnected from http://192.168.137.1:8000/tts/result");
+                    break;
+                }
+
+                int buffer_size = sizeof(buffer);
+
+                int remaining_data = stream->available();
+                last_data_check = millis();
+                while (remaining_data < buffer_size && millis() - last_data_check < time_tolerance_wait_available)
+                {
+                    delay(1);
+                    remaining_data = stream->available();
+                }
+
+                if (remaining_data >= buffer_size)
+                {
+                    bytesRead = stream->readBytes(buffer, buffer_size);
                 }
                 else if (remaining_data > 0)
                 {
                     bytesRead = stream->readBytes(buffer, remaining_data);
                 }
-                
-                if (remaining_data <= 0) break;
+
+                if (remaining_data <= 0)
+                {
+                    Serial.println("RequestBackendTTS: No remaining_data");
+                    break;
+                }
 
                 for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
                 {
                     int16_t *sample = ((int16_t *)buffer) + i;
-                    *sample = (int16_t)(*sample * 0.02); // Scale sample to 20% volume
+                    *sample = (int16_t)(*sample * 0.02);
                 }
 
                 size_t bytes_written;
                 i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
             }
+
+            Serial.println("------------------Finish this story text");
         }
         else
         {
-            Serial.printf("Failed to connect premade TTS, HTTP code: %d\n", httpCode);
+            Serial.printf("Failed to connect, HTTP code: %d\n", httpCode);
         }
-
         http_tts_result.end();
-
-        // Release the mutex to allow the next request
-        xSemaphoreGive(ttsMutex);
-        return result;
     }
     else
     {
-        Serial.println("Failed to acquire TTS mutex");
-        return false;
+        Serial.printf("Request tts api failed: %d\n", httpCode);
     }
+    http.end();
+
+    return result;
+}
+
+bool RequestBackendPremadeTTS_(String &url)
+{
+    bool result = false;
+
+    HTTPClient http_tts_result;
+    http_tts_result.setConnectTimeout(60000);
+    http_tts_result.setTimeout(60000);
+    http_tts_result.begin(url);
+
+    int httpCode = http_tts_result.GET();
+
+    if (httpCode == HTTP_CODE_OK)
+    {
+        stream = http_tts_result.getStreamPtr();
+        while (true)
+        {
+            if (!stream->connected())
+            {
+                Serial.print("| ERROR | Disconnected from ");
+                Serial.print(url);
+                Serial.print("\n");
+                break;
+            }
+
+            int buffer_size = sizeof(buffer);
+
+            int remaining_data = stream->available();
+            last_data_check = millis();
+            while (remaining_data < buffer_size && millis() - last_data_check < time_tolerance_wait_available)
+            {
+                delay(1);
+                remaining_data = stream->available();
+            }
+
+            if (remaining_data >= buffer_size)
+            {
+                bytesRead = stream->readBytes(buffer, buffer_size);
+            }
+            else if (remaining_data > 0)
+            {
+                bytesRead = stream->readBytes(buffer, remaining_data);
+            }
+
+            if (remaining_data <= 0)
+            {
+                Serial.println("RequestBackendPremadeTTS_: No remaining_data");
+                break;
+            }
+
+            for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
+            {
+                int16_t *sample = ((int16_t *)buffer) + i;
+                *sample = (int16_t)(*sample * 0.02); // Scale sample to 20% volume
+            }
+
+            size_t bytes_written;
+            i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
+        }
+    }
+    else
+    {
+        Serial.printf("Failed to connect premade TTS, HTTP code: %d\n", httpCode);
+    }
+
+    http_tts_result.end();
+
+    return result;
 }
 
 bool RequestBackendPremadeTTS(uint8_t premade_tts_code)
