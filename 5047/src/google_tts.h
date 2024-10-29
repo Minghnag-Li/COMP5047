@@ -6,16 +6,13 @@
 // extern bool bool_pause;
 // extern bool requesting;
 
-extern WiFiClient *stream;
-extern size_t bytesRead;
-extern uint8_t buffer[512];
 // extern HTTPClient http_tts_result;
 
-extern const uint8_t PREMADE_TTS_STORY_START = 0;
-extern const uint8_t PREMADE_TTS_QUEST_WAITING = 1;
-extern const uint8_t PREMADE_TTS_QUEST_DONE = 2;
-extern const uint8_t PREMADE_TTS_STORY_END = 3;
-extern const uint8_t PREMADE_TTS_QUEST_SKIPPED = 4;
+const uint8_t PREMADE_TTS_STORY_START = 0;
+const uint8_t PREMADE_TTS_QUEST_WAITING = 1;
+const uint8_t PREMADE_TTS_QUEST_DONE = 2;
+const uint8_t PREMADE_TTS_STORY_END = 3;
+const uint8_t PREMADE_TTS_QUEST_SKIPPED = 4;
 
 #pragma region Process_by_ESP32
 // void base64UrlEncode(const unsigned char *input, size_t length, String &output);

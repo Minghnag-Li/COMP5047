@@ -15,8 +15,7 @@
 
 // bool bool_pause = false;
 // bool requesting = false;
-
-WiFiClient *stream = nullptr;
+WiFiClient *stream;
 size_t bytesRead;
 uint8_t buffer[512];
 // HTTPClient http_tts_result;
