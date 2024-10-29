@@ -37,15 +37,15 @@ bool isWaitingPlayerNumStart = false;
 bool isStoryTelling = false;
 bool isOnQuest = false;
 bool isWaitingForQuestCompletion = false;
-
+bool isQuestCompleted = false;
 //color sensor vars
 volatile unsigned long redPulseCount = 0;
 volatile unsigned long greenPulseCount = 0;
 volatile unsigned long bluePulseCount = 0;
 
 //Wifi vars
-const char *ssid = "York148";    // TODO: replace with wifi ssid
-const char *password = "King33$$";
+const char *ssid = "YUKARISAW";    // TODO: replace with wifi ssid
+const char *password = "88888889";
 WiFiClient *streamClient;
 HTTPClient http;
 //TTS vars
@@ -156,8 +156,6 @@ void setup() {
     setupI2S();
     // Configure switch pin
     pinMode(SWITCH_PIN, INPUT);
-   
-    //SetAudioConfig(I2S_BCLK, I2S_LRCLK, I2S_DIN);
 
 
     //bool result = RequestBackendTTS(textToTranserToTTS);
@@ -167,6 +165,7 @@ void setup() {
 
     // Configure wakeup source
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(SWITCH_PIN), 1); // Wake up when switch is turned ON
+    //RequestBackendPremadeTTS(PREMADE_TTS_STORY_START);
 }
 
 
@@ -231,7 +230,8 @@ void waitTimerForQuest(){
     if(!isWaitingForQuestCompletion){
         quest_time_stamp = millis();
         isWaitingForQuestCompletion = true;
-    }if(millis() - quest_time_stamp >= 60000){
+    }
+    if(millis() - quest_time_stamp >= 10000){
         isWaitingForQuestCompletion = false;
     }
 }
@@ -307,7 +307,7 @@ void checkSystemTurnOn(){
     }
 }
 
-const int MAX_PARTS = 30; 
+const int MAX_PARTS = 50; 
 
 int splitStringWithTokens(const String& text, String result[], int maxParts) {
     int currentIndex = 0;
@@ -393,8 +393,11 @@ void loop() {
             //split the response string with * as delimeter and include * as a separate element
             int numParts = splitStringWithTokens(textToTranserToTTS, parts, MAX_PARTS);
             Serial.println("Split parts:");
-            Serial.println("These string will be feed to TTS, needs to be cleaned of tokens");
-            for (int i = 0; i < numParts; ++i) {
+            RequestBackendPremadeTTS(PREMADE_TTS_STORY_START);
+        
+            for (int i = 0; i < numParts; i++) {
+                Serial.print("--------------------- index of element sent");
+                Serial.print(parts[i]);
                 if (parts[i] != "*" && 
                     parts[i] != "$" &&
                     parts[i] != "(1)" &&
@@ -403,21 +406,23 @@ void loop() {
                     isOnQuest = false;
                     isStoryTelling = true;
                     //if not isOnQuest and isStoryTelling
-                    //transportTextToTTS(parts[i]); 
-                    Serial.println(i);
-                    Serial.println(parts[i]);
-                    //This run inside loop() so it needs something to restrain the frequency of request sending to TTS module
+                    
+                    RequestBackendTTS(parts[i]);
                 }else{
                     isOnQuest = true;
                     isStoryTelling = false;
+                    RequestBackendPremadeTTS(PREMADE_TTS_QUEST_WAITING);
                     if (parts[i] == "*"){
                         //detect color quest
                         if (parts[i+1] == "(1)"){
                             //red
+                            waitTimerForQuest();
                         }else if(parts[i+1] == "(2)"){
                             //green
+                            waitTimerForQuest();
                         }else if(parts[i+1] == "(3)"){
                             //blue
+                            waitTimerForQuest();
                         }
                         //this is when the story telling needs to stop and quest handling will kick in
                         
@@ -425,8 +430,10 @@ void loop() {
                         //detect movement quest
                         if (parts[i+1] == "(1)"){
                             //3m
+                            waitTimerForQuest();
                         }else if(parts[i+1] == "(2)"){
                             //6m
+                            waitTimerForQuest();
                         }
                     }
                 }  
