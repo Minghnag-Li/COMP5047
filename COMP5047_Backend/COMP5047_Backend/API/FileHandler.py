@@ -242,6 +242,30 @@ def get_premade_result(request, text):
                 if not os.path.exists("quest_skipped.wav"):
                     request_premade("Quest skipped!", "quest_skipped")
                 return FileResponse(open("quest_skipped.wav", "rb"), as_attachment=True)
+            case "power_on":
+                if not os.path.exists("power_on.wav"):
+                    request_premade("Power on!", "power_on")
+                return FileResponse(open("power_on.wav", "rb"), as_attachment=True)
+            case "power_off":
+                if not os.path.exists("power_off.wav"):
+                    request_premade("Power off!", "power_off")
+                return FileResponse(open("power_off.wav", "rb"), as_attachment=True)
+            case "player_number_1":
+                if not os.path.exists("player_number_1.wav"):
+                    request_premade("Player number 1!", "player_number_1")
+                return FileResponse(open("player_number_1.wav", "rb"), as_attachment=True)
+            case "player_number_2":
+                if not os.path.exists("player_number_2.wav"):
+                    request_premade("Player number 2!", "player_number_2")
+                return FileResponse(open("player_number_2.wav", "rb"), as_attachment=True)
+            case "player_number_3":
+                if not os.path.exists("player_number_3.wav"):
+                    request_premade("Player number 3!", "player_number_3")
+                return FileResponse(open("player_number_3.wav", "rb"), as_attachment=True)
+            case "waiting_for_player":
+                if not os.path.exists("waiting_for_player.wav"):
+                    request_premade("Waiting for player!", "waiting_for_player")
+                return FileResponse(open("waiting_for_player.wav", "rb"), as_attachment=True)
             case _:
                 if not os.path.exists("undefined.wav"):
                     request_premade("Undefined!", "undefined")
