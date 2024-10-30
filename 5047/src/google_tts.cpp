@@ -12,6 +12,7 @@
 #include <google_tts.h>
 
 #include <driver/i2s.h>
+#include <global.h>
 
 // bool bool_pause = false;
 // bool requesting = false;
@@ -19,7 +20,7 @@ WiFiClient *stream;
 size_t bytesRead;
 uint8_t buffer[512];
 unsigned long last_data_check = 0;
-const unsigned long time_tolerance_wait_available = 100;
+const unsigned long time_tolerance_wait_available = 1000;
 
 // HTTPClient http_tts_result;
 
@@ -400,6 +401,11 @@ bool RequestBackendTTS(String &text)
             stream = http_tts_result.getStreamPtr();
             while (true)
             {
+                if (digitalRead(SWITCH_PIN) == LOW)
+                {
+                    break;
+                }
+
                 if (!stream->connected())
                 {
                     Serial.println("| ERROR | Disconnected from http://192.168.137.1:8000/tts/result");
@@ -431,11 +437,11 @@ bool RequestBackendTTS(String &text)
                     break;
                 }
 
-                for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
-                {
-                    int16_t *sample = ((int16_t *)buffer) + i;
-                    *sample = (int16_t)(*sample * 0.02);
-                }
+                // for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
+                // {
+                //     int16_t *sample = ((int16_t *)buffer) + i;
+                //     *sample = (int16_t)(*sample * 0.02);
+                // }
 
                 size_t bytes_written;
                 i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
@@ -503,15 +509,16 @@ bool RequestBackendPremadeTTS_(String &url)
 
             if (remaining_data <= 0)
             {
+                Serial.println(url);
                 Serial.println("RequestBackendPremadeTTS_: No remaining_data");
                 break;
             }
 
-            for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
-            {
-                int16_t *sample = ((int16_t *)buffer) + i;
-                *sample = (int16_t)(*sample * 0.02); // Scale sample to 20% volume
-            }
+            // for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
+            // {
+            //     int16_t *sample = ((int16_t *)buffer) + i;
+            //     *sample = (int16_t)(*sample * 0.02); // Scale sample to 20% volume
+            // }
 
             size_t bytes_written;
             i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
@@ -546,6 +553,24 @@ bool RequestBackendPremadeTTS(uint8_t premade_tts_code)
         break;
     case PREMADE_TTS_QUEST_SKIPPED:
         url += "quest_skipped";
+        break;
+    case PREMADE_TTS_POWER_ON:
+        url += "power_on";
+        break;
+    case PREMADE_TTS_POWER_OFF:
+        url += "power_off";
+        break;
+    case PREMADE_TTS_PLAYER_NUMBER_1:
+        url += "player_number_1";
+        break;
+    case PREMADE_TTS_PLAYER_NUMBER_2:
+        url += "player_number_2";
+        break;
+    case PREMADE_TTS_PLAYER_NUMBER_3:
+        url += "player_number_3";
+        break;
+    case PREMADE_TTS_WAITING_FOR_PLAYER:
+        url += "waiting_for_player";
         break;
     default:
         url += "undefined";

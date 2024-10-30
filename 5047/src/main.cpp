@@ -171,6 +171,8 @@ void setup()
     pinMode(OUT_PIN, INPUT);
     pinMode(PUSH_PIN, INPUT);
     pinMode(CS_LED_PIN, OUTPUT);
+    pinMode(SWITCH_PIN, INPUT);
+
     // turn on CS LED
 
     digitalWrite(CS_LED_PIN, HIGH);
@@ -182,7 +184,6 @@ void setup()
     // timerAttachInterrupt(timer, &onTimer, true); // Attach interrupt
     // timerAlarmWrite(timer, 1000000, true);       // Set alarm to trigger every 1 second
     // timerAlarmEnable(timer);
-
     // Start the serial communication for debugging
     Serial.begin(115200);
 
@@ -209,8 +210,6 @@ void setup()
 
     // Initialize I2S
     setupI2S();
-    // Configure switch pin
-    pinMode(SWITCH_PIN, INPUT);
 
     // Configure wakeup source
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(SWITCH_PIN), 1); // Wake up when switch is turned ON
