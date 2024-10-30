@@ -52,11 +52,6 @@ int numParts = 0;
 /// @brief Use pointer to traverse all story parts
 int part_pointer = 0;
 
-// color sensor vars
-volatile unsigned long redPulseCount = 0;
-volatile unsigned long greenPulseCount = 0;
-volatile unsigned long bluePulseCount = 0;
-
 // Wifi vars
 const char *ssid = "YUKARISAW"; // TODO: replace with wifi ssid
 const char *password = "88888889";
@@ -69,8 +64,55 @@ int player_num = 0; // TODO: player number var here
 // AI API vars
 bool hasMadeAIAPIrequest = false;
 
+uint8_t quest_value = 0;
+bool isOnMovingQuest = false;
+bool iscompleteColorQuest = false;
+
 hw_timer_t *timer = NULL;
 int frequency = 0;
+
+/// @brief Color sensor
+int redValue = 0;
+/// @brief Color sensor
+int greenValue = 0;
+/// @brief Color sensor
+int blueValue = 0;
+
+void Initialise()
+{
+    player_num_time_stamp = 0;
+    quest_time_stamp = 0;
+    buttonState = LOW;
+    newButtonState = LOW;
+    buttonPressedTimeStamp = 0;
+    debounceWindow = 40;
+    counted = 0;
+    isWaitingForPlayerNum = true;
+    systemActive = false;
+    player_num_button_pressed = false;
+    isWaitingPlayerNumStart = false;
+
+    isStoryTelling = false;
+    isOnQuest = false;
+    isOnColorQuest = false;
+    isGPSturnedOn = false;
+    hasStoryVoiceReturned = false;
+    numParts = 0;
+    part_pointer = 0;
+
+    player_num = 0;
+    hasMadeAIAPIrequest = false;
+
+    quest_value = 0;
+    isOnMovingQuest = false;
+    iscompleteColorQuest = false;
+
+    frequency = 0;
+    redValue = 0;
+    greenValue = 0;
+    blueValue = 0;
+}
+
 void IRAM_ATTR onTimer()
 {
     // redd
@@ -219,6 +261,22 @@ void setPlayerNum()
 
             Serial.print("player_num: ");
             Serial.print(player_num);
+            switch (player_num)
+            {
+            case 1:
+                RequestBackendPremadeTTS(PREMADE_TTS_PLAYER_NUMBER_1);
+                break;
+            case 2:
+                RequestBackendPremadeTTS(PREMADE_TTS_PLAYER_NUMBER_2);
+                break;
+            case 3:
+                RequestBackendPremadeTTS(PREMADE_TTS_PLAYER_NUMBER_3);
+                break;
+            case 0:
+                RequestBackendPremadeTTS(PREMADE_TTS_WAITING_FOR_PLAYER);
+            default:
+                break;
+            }
         }
     }
     buttonState = newButtonState;
@@ -246,9 +304,6 @@ void waitTimerForQuest()
         isOnQuest = false;
     }
 }
-int redValue = 0;
-int greenValue = 0;
-int blueValue = 0;
 
 bool colorChecking(int random_color)
 {
@@ -346,23 +401,6 @@ void GPSturnOn()
     }
 }
 
-void checkSystemTurnOn()
-{
-    // Check if system turning on or off base on the signal read from switch button
-    bool currentSwitchState = digitalRead(SWITCH_PIN);
-    if (currentSwitchState == LOW)
-    {
-        Serial.println("System is OFF, entering deep sleep");
-        delay(100);             // Small delay before sleep
-        esp_deep_sleep_start(); // Enter deep sleep
-    }
-    else if (currentSwitchState == HIGH && !systemActive)
-    {
-        systemActive = true;
-        Serial.println("System is ON");
-    }
-}
-
 int splitStringWithTokens(const String &text, String result[], int maxParts)
 {
     int currentIndex = 0;
@@ -435,23 +473,26 @@ int splitStringWithTokens(const String &text, String result[], int maxParts)
     return currentIndex; // Returns the number of parts in the result array
 }
 
-uint8_t quest_value = 0;
-bool isOnMovingQuest = false;
-bool iscompleteColorQuest = false;
 void loop()
 {
     bool currentSwitchState = digitalRead(SWITCH_PIN);
     if (currentSwitchState == LOW)
     {
         Serial.println("System is OFF, entering deep sleep");
+        RequestBackendPremadeTTS(PREMADE_TTS_POWER_OFF);
         delay(100);             // Small delay before sleep
         esp_deep_sleep_start(); // Enter deep sleep
     }
-    else if (currentSwitchState == HIGH && !systemActive)
+    else if (currentSwitchState == HIGH)
     {
-        systemActive = true;
-        Serial.println("System is ON");
-   
+        if (!systemActive)
+        {
+            Initialise();
+            systemActive = true;
+            Serial.println("System is ON");
+            RequestBackendPremadeTTS(PREMADE_TTS_POWER_ON);
+        }
+
         if (isOnQuest)
         {
             waitTimerForQuest();
@@ -481,9 +522,8 @@ void loop()
 
             if (isOnMovingQuest)
             {
-                //checking logic for moving quest done here
+                // checking logic for moving quest done here
 
-                
                 if (isOnMovingQuest)
                 {
                     isOnMovingQuest = false;
@@ -580,7 +620,12 @@ void loop()
             else
             {
                 RequestBackendPremadeTTS(PREMADE_TTS_STORY_END);
+                delay(100);
                 isStoryTelling = false;
+                systemActive = false;
+                RequestBackendPremadeTTS(PREMADE_TTS_POWER_OFF);
+                delay(100);             // Small delay before sleep
+                esp_deep_sleep_start(); // Enter deep sleep
             }
         }
         else
@@ -599,7 +644,6 @@ void loop()
             }
             else if (!isWaitingForPlayerNum)
             {
-                systemActive = true;
                 GPSturnOn();
                 if (!hasMadeAIAPIrequest)
                 {
