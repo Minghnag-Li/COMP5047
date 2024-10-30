@@ -13,6 +13,12 @@ const uint8_t PREMADE_TTS_QUEST_WAITING = 1;
 const uint8_t PREMADE_TTS_QUEST_DONE = 2;
 const uint8_t PREMADE_TTS_STORY_END = 3;
 const uint8_t PREMADE_TTS_QUEST_SKIPPED = 4;
+const uint8_t PREMADE_TTS_POWER_ON = 5;
+const uint8_t PREMADE_TTS_POWER_OFF = 6;
+const uint8_t PREMADE_TTS_PLAYER_NUMBER_1 = 7;
+const uint8_t PREMADE_TTS_PLAYER_NUMBER_2 = 8;
+const uint8_t PREMADE_TTS_PLAYER_NUMBER_3 = 9;
+const uint8_t PREMADE_TTS_WAITING_FOR_PLAYER = 10;
 
 #pragma region Process_by_ESP32
 // void base64UrlEncode(const unsigned char *input, size_t length, String &output);
