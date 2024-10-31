@@ -437,11 +437,11 @@ bool RequestBackendTTS(String &text)
                     break;
                 }
 
-                for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
-                {
-                    int16_t *sample = ((int16_t *)buffer) + i;
-                    *sample = (int16_t)(*sample * 0.03);
-                }
+                // for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
+                // {
+                //     int16_t *sample = ((int16_t *)buffer) + i;
+                //     *sample = (int16_t)(*sample * 0.03);
+                // }
 
                 size_t bytes_written;
                 i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
@@ -514,11 +514,11 @@ bool RequestBackendPremadeTTS_(String &url)
                 break;
             }
 
-            for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
-            {
-                int16_t *sample = ((int16_t *)buffer) + i;
-                *sample = (int16_t)(*sample * 0.03); // Scale sample to 20% volume
-            }
+            // for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
+            // {
+            //     int16_t *sample = ((int16_t *)buffer) + i;
+            //     *sample = (int16_t)(*sample * 0.03); // Scale sample to 20% volume
+            // }
 
             size_t bytes_written;
             i2s_write(I2S_NUM_0, buffer, bytesRead, &bytes_written, portMAX_DELAY);
