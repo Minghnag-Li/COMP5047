@@ -7,12 +7,15 @@
 #define I2S_DIN 22   // Data Input pin
 
 #define SWITCH_PIN 35
-#define PUSH_PIN 34
+#define PUSH_PIN 15
 #define CS_LED_PIN 19
 #define S0 13
 #define S1 14
 #define S2 0
 #define S3 26
+#define X 34
+#define Y 39
+#define Z 36
 #define OUT_PIN 25
 
 #endif

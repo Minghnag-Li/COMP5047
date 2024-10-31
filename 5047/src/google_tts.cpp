@@ -440,7 +440,7 @@ bool RequestBackendTTS(String &text)
                 // for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
                 // {
                 //     int16_t *sample = ((int16_t *)buffer) + i;
-                //     *sample = (int16_t)(*sample * 0.02);
+                //     *sample = (int16_t)(*sample * 0.03);
                 // }
 
                 size_t bytes_written;
@@ -517,7 +517,7 @@ bool RequestBackendPremadeTTS_(String &url)
             // for (size_t i = 0; i < bytesRead / sizeof(int16_t); i++)
             // {
             //     int16_t *sample = ((int16_t *)buffer) + i;
-            //     *sample = (int16_t)(*sample * 0.02); // Scale sample to 20% volume
+            //     *sample = (int16_t)(*sample * 0.03); // Scale sample to 20% volume
             // }
 
             size_t bytes_written;

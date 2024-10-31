@@ -3,7 +3,6 @@
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
 #include <HTTPClient.h>
-#include <TinyGPS++.h>
 #include <HardwareSerial.h>
 #include <driver/i2s.h>
 #include <esp_sleep.h>
@@ -16,10 +15,7 @@
 #include <iostream>
 #include <sstream>
 
-TinyGPSPlus gps;
 
-// Define hardware serial port for GPS
-HardwareSerial SerialGPS(2);
 // timestamps
 int player_num_time_stamp = 0;
 int quest_time_stamp = 0;
@@ -41,8 +37,7 @@ bool isStoryTelling = false;
 bool isOnQuest = false;
 /// @brief Color sensor
 bool isOnColorQuest = false;
-/// @brief GPS sensor
-bool isGPSturnedOn = false;
+
 bool hasStoryVoiceReturned = false;
 
 const int MAX_PARTS = 50;
@@ -51,6 +46,14 @@ String parts[MAX_PARTS];
 int numParts = 0;
 /// @brief Use pointer to traverse all story parts
 int part_pointer = 0;
+// accelerometer
+int stepCount = 0;
+const float g_scale = 3.0 / 4095;
+float threshold = 0.22;  // Scale factor for g-force
+const float X_baseline = 1900;
+const float Y_baseline = 1900;
+const float Z_baseline = 2300;
+int prev_stepCount = 0;
 
 // Wifi vars
 const char *ssid = "YUKARISAW"; // TODO: replace with wifi ssid
@@ -67,6 +70,7 @@ bool hasMadeAIAPIrequest = false;
 uint8_t quest_value = 0;
 bool isOnMovingQuest = false;
 bool iscompleteColorQuest = false;
+bool isCompleteMovingQuest = false;
 
 hw_timer_t *timer = NULL;
 int frequency = 0;
@@ -78,6 +82,13 @@ int greenValue = 0;
 /// @brief Color sensor
 int blueValue = 0;
 
+/// @brief Accelerometer
+int x_coor = 0;
+// @brief Accelerometer
+int y_coor = 0;
+// @brief Accelerometer
+int z_coor = 0;
+ 
 void Initialise()
 {
     player_num_time_stamp = 0;
@@ -95,7 +106,6 @@ void Initialise()
     isStoryTelling = false;
     isOnQuest = false;
     isOnColorQuest = false;
-    isGPSturnedOn = false;
     hasStoryVoiceReturned = false;
     numParts = 0;
     part_pointer = 0;
@@ -111,6 +121,9 @@ void Initialise()
     redValue = 0;
     greenValue = 0;
     blueValue = 0;
+    x_coor = 0;
+    y_coor = 0;
+    z_coor = 0;
 }
 
 void IRAM_ATTR onTimer()
@@ -164,6 +177,7 @@ void setupI2S()
 void setup()
 {
     Serial.begin(115200);
+    //color sensor
     pinMode(S0, OUTPUT);
     pinMode(S1, OUTPUT);
     pinMode(S2, OUTPUT);
@@ -180,17 +194,13 @@ void setup()
     digitalWrite(PUSH_PIN, HIGH);
     digitalWrite(S0, HIGH);
     digitalWrite(S1, LOW);
-    // timer = timerBegin(0, 80, true);             // Timer 0, prescaler 80
-    // timerAttachInterrupt(timer, &onTimer, true); // Attach interrupt
-    // timerAlarmWrite(timer, 1000000, true);       // Set alarm to trigger every 1 second
-    // timerAlarmEnable(timer);
-    // Start the serial communication for debugging
+   // Accelerometer
     Serial.begin(115200);
+    pinMode(X, OUTPUT);
+    pinMode(Y, OUTPUT);
+    pinMode(Z,OUTPUT);
+   
 
-    // Start the serial communication for GPS (D10=GPIO16 RX, D11=GPIO17 TX)
-    SerialGPS.begin(9600, SERIAL_8N1, 16, 17);
-
-    Serial.println("GPS Module with FireBeetle ESP32-E Setup");
     WiFi.begin(ssid, password); // Connect to the Wi-Fi network.
     int count = 0;
     while (WiFi.status() != WL_CONNECTED)
@@ -303,38 +313,27 @@ void waitTimerForQuest()
         isOnQuest = false;
     }
 }
-
+//color detection logic
 bool colorChecking(int random_color)
 {
 
     digitalWrite(S2, LOW);
     digitalWrite(S3, LOW);
     frequency = pulseIn(OUT_PIN, LOW);
-    // Serial.print("R= ");
     redValue = frequency;
-    // Serial.print(frequency);
-    // Serial.print(" ");
 
-    // delay(100);
 
     digitalWrite(S2, HIGH);
     digitalWrite(S3, HIGH);
     frequency = pulseIn(OUT_PIN, LOW);
-    // Serial.print("G= ");
     greenValue = frequency;
-    // Serial.print(frequency);
-    // Serial.print(" ");
-    // delay(100);
+
 
     digitalWrite(S2, LOW);
     digitalWrite(S3, HIGH);
     frequency = pulseIn(OUT_PIN, LOW);
     blueValue = frequency;
-    // Serial.print("B= ");
-    // Serial.print(frequency);
-    // Serial.println(" ");
 
-    // delay(100);
 
     // check red
     if (random_color == 1)
@@ -373,32 +372,46 @@ bool colorChecking(int random_color)
     return false;
 }
 
-void GPSturnOn()
-{
-    // If the system is active, proceed with GPS reading and tone generation
-    if (systemActive)
-    {
-        // Read data from GPS module
-        while (SerialGPS.available() > 0)
-        {
-            gps.encode(SerialGPS.read());
-        }
 
-        // If GPS data is valid, print it
-        if (gps.location.isUpdated())
-        {
-            isGPSturnedOn = true;
-            Serial.print("Latitude: ");
-            Serial.println(gps.location.lat(), 6);
-            Serial.print("Longitude: ");
-            Serial.println(gps.location.lng(), 6);
-            Serial.print("Altitude: ");
-            Serial.println(gps.altitude.meters());
-            Serial.print("Satellites: ");
-            Serial.println(gps.satellites.value());
-        }
+//Accelerometer
+bool movingChecking(int distance){
+    x_coor = analogRead(X);
+    y_coor = analogRead(Y);
+    z_coor = analogRead(Z);
+    
+    float xAccel = (x_coor - X_baseline) * g_scale;
+    float yAccel = (y_coor - Y_baseline) * g_scale;
+    float zAccel = (z_coor - Z_baseline) * g_scale;
+
+  // Calculate magnitude
+    float magnitude = sqrt(xAccel * xAccel + yAccel * yAccel + zAccel * zAccel);
+    //check if a step was made
+    if (magnitude > threshold) {
+        stepCount++;
+        delay(100);
     }
+
+    
+    Serial.print(stepCount);
+    Serial.print(" ");
+    Serial.print(prev_stepCount);
+    Serial.println(" ");
+    if (distance == 1){
+        //3m
+        if(stepCount - prev_stepCount >= 6){
+            return true;
+        }
+        return false;
+    }else if (distance == 2){
+        //6m
+        if(stepCount - prev_stepCount >= 12){
+            return true;
+        }
+        return false;
+    }
+
 }
+
 
 int splitStringWithTokens(const String &text, String result[], int maxParts)
 {
@@ -474,6 +487,7 @@ int splitStringWithTokens(const String &text, String result[], int maxParts)
 
 void loop()
 {
+    
     bool currentSwitchState = digitalRead(SWITCH_PIN);
     if (currentSwitchState == LOW)
     {
@@ -522,10 +536,17 @@ void loop()
             if (isOnMovingQuest)
             {
                 // checking logic for moving quest done here
+                if(quest_value == 1){
+                    isCompleteMovingQuest = movingChecking(1);
+                }
+                else if(quest_value == 2){
+                    isCompleteMovingQuest = movingChecking(2);
+                }
 
-                if (isOnMovingQuest)
+                if (isCompleteMovingQuest)
                 {
                     isOnMovingQuest = false;
+                    prev_stepCount = stepCount;
                     RequestBackendPremadeTTS(PREMADE_TTS_QUEST_DONE);
                 }
             }
@@ -643,7 +664,6 @@ void loop()
             }
             else if (!isWaitingForPlayerNum)
             {
-                GPSturnOn();
                 if (!hasMadeAIAPIrequest)
                 {
                     Serial.println("-----------------Making request to AI");
